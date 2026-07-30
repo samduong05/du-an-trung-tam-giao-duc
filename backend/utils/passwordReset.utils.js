@@ -1,0 +1,12 @@
+const crypto = require("crypto");
+
+const hashResetValue = (value) => {
+  return crypto
+    .createHash("sha256")
+    .update(String(value))
+    .digest("hex");
+};
+
+module.exports = {
+  hashResetValue,
+};
