@@ -15,6 +15,8 @@ const {
 
 const router = express.Router();
 
+// Admin tạo teacher/student.
+// Teacher chỉ tạo student.
 router.post(
   "/",
   authentication,
@@ -22,27 +24,13 @@ router.post(
   createUser,
 );
 
-router.get("/", authentication, authorizeRoles("admin", "teacher"), getUsers);
+// Chỉ admin được quản lý tài khoản.
+router.get("/", authentication, authorizeRoles("admin"), getUsers);
 
-router.get(
-  "/:id",
-  authentication,
-  authorizeRoles("admin", "teacher"),
-  getUserById,
-);
+router.get("/:id", authentication, authorizeRoles("admin"), getUserById);
 
-router.put(
-  "/:id",
-  authentication,
-  authorizeRoles("admin", "teacher"),
-  updateUser,
-);
+router.put("/:id", authentication, authorizeRoles("admin"), updateUser);
 
-router.delete(
-  "/:id",
-  authentication,
-  authorizeRoles("admin", "teacher"),
-  deleteUser,
-);
+router.delete("/:id", authentication, authorizeRoles("admin"), deleteUser);
 
 module.exports = router;

@@ -23,7 +23,7 @@ export default function AdminDashboard() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Dashboard</h1>
+        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
 
         <p className="mt-1 text-sm text-slate-500">
           Tổng quan hoạt động của trung tâm
@@ -48,7 +48,7 @@ export default function AdminDashboard() {
                     <Icon size={24} />
                   </div>
                 </div>
-                <p className="mt-2 text-3xl font-bold text-slate-800">
+                <p className="mt-2 text-3xl font-bold text-slate-900">
                   {item.value}
                 </p>
               </div>

@@ -1,120 +1,161 @@
 const mongoose = require("mongoose");
+
 const Material = require("../models/Material.model");
 const Class = require("../models/Class.model");
 
+const MATERIAL_TYPES = ["curriculum", "supplementary"];
 const MATERIAL_STATUSES = ["published", "hidden"];
 
 const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// Kiểm tra người dùng có quyền truy cập lớp hay không
-const checkClassAccess = async (classId, user) => {
-  if (!isValidObjectId(classId)) {
-    return {
-      error: {
-        status: 400,
-        message: "classId không hợp lệ",
-      },
-    };
+const normalizeObjectIds = (ids) => {
+  return [...new Set(ids.map((id) => id.toString()))];
+};
+
+const validateClassIds = (classIds) => {
+  if (!Array.isArray(classIds) || classIds.length === 0) {
+    return "classIds phải là một mảng và có ít nhất một lớp học";
   }
 
-  const classData = await Class.findById(classId);
+  const normalizedClassIds = normalizeObjectIds(classIds);
 
-  if (!classData) {
+  const hasInvalidId = normalizedClassIds.some(
+    (classId) => !isValidObjectId(classId),
+  );
+
+  if (hasInvalidId) {
+    return "Một hoặc nhiều classIds không hợp lệ";
+  }
+
+  return null;
+};
+
+const getClassesByIds = async (classIds) => {
+  const normalizedClassIds = normalizeObjectIds(classIds);
+
+  const classes = await Class.find({
+    _id: {
+      $in: normalizedClassIds,
+    },
+  }).select("_id name teacher students");
+
+  if (classes.length !== normalizedClassIds.length) {
     return {
       error: {
         status: 404,
-        message: "Không tìm thấy lớp học",
+        message: "Một hoặc nhiều lớp học không tồn tại",
       },
-    };
-  }
-
-  // Admin truy cập tất cả lớp
-  if (user.role === "admin") {
-    return {
-      classData,
-    };
-  }
-
-  // Giáo viên chỉ truy cập lớp mình phụ trách
-  if (user.role === "teacher") {
-    if (
-      !classData.teacher ||
-      classData.teacher.toString() !== user._id.toString()
-    ) {
-      return {
-        error: {
-          status: 403,
-          message: "Bạn không có quyền quản lý tài liệu của lớp này",
-        },
-      };
-    }
-
-    return {
-      classData,
-    };
-  }
-
-  // Học sinh chỉ truy cập lớp mình đang học
-  if (user.role === "student") {
-    const isStudentInClass = classData.students.some(
-      (studentId) => studentId.toString() === user._id.toString(),
-    );
-
-    if (!isStudentInClass) {
-      return {
-        error: {
-          status: 403,
-          message: "Bạn không thuộc lớp học này",
-        },
-      };
-    }
-
-    return {
-      classData,
     };
   }
 
   return {
-    error: {
-      status: 403,
-      message: "Bạn không có quyền truy cập lớp học này",
-    },
+    classes,
+    normalizedClassIds,
   };
+};
+
+const teacherOwnsAllClasses = (classes, teacherId) => {
+  return classes.every(
+    (classData) =>
+      classData.teacher &&
+      classData.teacher.toString() === teacherId.toString(),
+  );
+};
+
+const getAccessibleClassIds = async (user) => {
+  if (user.role === "admin") {
+    return null;
+  }
+
+  if (user.role === "teacher") {
+    const classes = await Class.find({
+      teacher: user._id,
+    }).select("_id");
+
+    return classes.map((classData) => classData._id);
+  }
+
+  if (user.role === "student") {
+    const classes = await Class.find({
+      students: user._id,
+    }).select("_id");
+
+    return classes.map((classData) => classData._id);
+  }
+
+  return [];
+};
+
+const canAccessMaterial = async (material, user) => {
+  if (user.role === "admin") {
+    return true;
+  }
+
+  if (user.role === "student" && material.status !== "published") {
+    return false;
+  }
+
+  const accessibleClassIds = await getAccessibleClassIds(user);
+
+  const accessibleClassIdSet = new Set(
+    accessibleClassIds.map((classId) => classId.toString()),
+  );
+
+  return material.classIds.some((classId) => {
+    const id = classId?._id || classId;
+
+    return accessibleClassIdSet.has(id.toString());
+  });
 };
 
 // POST /api/v1/materials
 const createMaterial = async (req, res) => {
   try {
     const {
-      classId,
+      classIds,
+      materialType,
       title,
-      description,
+      description = "",
       files = [],
       links = [],
       status = "published",
     } = req.body;
 
-    if (!classId) {
+    const classIdsError = validateClassIds(classIds);
+
+    if (classIdsError) {
       return res.status(400).json({
-        message: "Vui lòng nhập classId",
+        message: classIdsError,
       });
     }
 
-    if (!title || !title.trim()) {
+    if (!MATERIAL_TYPES.includes(materialType)) {
+      return res.status(400).json({
+        message: "Loại tài liệu không hợp lệ",
+      });
+    }
+
+    if (req.user.role === "admin" && materialType !== "curriculum") {
+      return res.status(403).json({
+        message: "Admin chỉ tạo giáo trình chính thức",
+      });
+    }
+
+    if (req.user.role === "teacher" && materialType !== "supplementary") {
+      return res.status(403).json({
+        message: "Giáo viên chỉ được tạo tài liệu bổ sung",
+      });
+    }
+
+    if (!title || typeof title !== "string" || !title.trim()) {
       return res.status(400).json({
         message: "Vui lòng nhập tiêu đề tài liệu",
       });
     }
 
-    if (!description || !description.trim()) {
+    if (description !== undefined && typeof description !== "string") {
       return res.status(400).json({
-        message: "Vui lòng nhập mô tả tài liệu",
-      });
-    }
-
-    if (!MATERIAL_STATUSES.includes(status)) {
-      return res.status(400).json({
-        message: "Trạng thái tài liệu không hợp lệ",
+        message: "Mô tả tài liệu không hợp lệ",
       });
     }
 
@@ -130,28 +171,35 @@ const createMaterial = async (req, res) => {
       });
     }
 
-    const accessResult = await checkClassAccess(classId, req.user);
-
-    if (accessResult.error) {
-      return res.status(accessResult.error.status).json({
-        message: accessResult.error.message,
+    if (!MATERIAL_STATUSES.includes(status)) {
+      return res.status(400).json({
+        message: "Trạng thái tài liệu không hợp lệ",
       });
     }
 
-    const { classData } = accessResult;
+    const classResult = await getClassesByIds(classIds);
 
-    if (!classData.teacher) {
-      return res.status(400).json({
-        message: "Lớp học chưa có giáo viên phụ trách",
+    if (classResult.error) {
+      return res.status(classResult.error.status).json({
+        message: classResult.error.message,
+      });
+    }
+
+    const { classes, normalizedClassIds } = classResult;
+
+    if (
+      req.user.role === "teacher" &&
+      !teacherOwnsAllClasses(classes, req.user._id)
+    ) {
+      return res.status(403).json({
+        message: "Bạn chỉ được tạo tài liệu cho lớp mình phụ trách",
       });
     }
 
     const material = await Material.create({
-      classId: classData._id,
-
-      // Luôn lấy giáo viên đang phụ trách lớp
-      teacherId: classData.teacher,
-
+      classIds: normalizedClassIds,
+      createdBy: req.user._id,
+      materialType,
       title: title.trim(),
       description: description.trim(),
       files,
@@ -160,8 +208,8 @@ const createMaterial = async (req, res) => {
     });
 
     const populatedMaterial = await Material.findById(material._id)
-      .populate("classId", "name description")
-      .populate("teacherId", "name email");
+      .populate("classIds", "name description subject status")
+      .populate("createdBy", "name email role");
 
     return res.status(201).json({
       message: "Tạo tài liệu thành công",
@@ -183,20 +231,36 @@ const createMaterial = async (req, res) => {
 };
 
 // GET /api/v1/materials
-// Có thể lọc:
 // ?classId=...
+// ?materialType=curriculum
 // ?status=published
 // ?search=grammar
 const getMaterials = async (req, res) => {
   try {
-    const { classId, status, search } = req.query;
+    const { classId, materialType, status, search } = req.query;
 
     const filter = {};
+
+    if (classId && !isValidObjectId(classId)) {
+      return res.status(400).json({
+        message: "classId không hợp lệ",
+      });
+    }
+
+    if (materialType && !MATERIAL_TYPES.includes(materialType)) {
+      return res.status(400).json({
+        message: "Loại tài liệu không hợp lệ",
+      });
+    }
 
     if (status && !MATERIAL_STATUSES.includes(status)) {
       return res.status(400).json({
         message: "Trạng thái tài liệu không hợp lệ",
       });
+    }
+
+    if (materialType) {
+      filter.materialType = materialType;
     }
 
     if (search && search.trim()) {
@@ -216,56 +280,48 @@ const getMaterials = async (req, res) => {
       ];
     }
 
-    /*
-     * Khi có classId:
-     * kiểm tra trực tiếp người dùng có quyền xem lớp đó hay không.
-     */
-    if (classId) {
-      const accessResult = await checkClassAccess(classId, req.user);
-
-      if (accessResult.error) {
-        return res.status(accessResult.error.status).json({
-          message: accessResult.error.message,
-        });
+    if (req.user.role === "admin") {
+      if (classId) {
+        filter.classIds = classId;
       }
 
-      filter.classId = classId;
+      if (status) {
+        filter.status = status;
+      }
     } else {
-      /*
-       * Khi không có classId:
-       * tìm tất cả lớp người dùng có quyền truy cập.
-       */
-      if (req.user.role === "teacher") {
-        const classes = await Class.find({
-          teacher: req.user._id,
-        }).select("_id");
+      const accessibleClassIds = await getAccessibleClassIds(req.user);
 
-        filter.classId = {
-          $in: classes.map((classData) => classData._id),
+      const accessibleClassIdStrings = new Set(
+        accessibleClassIds.map((id) => id.toString()),
+      );
+
+      if (classId) {
+        if (!accessibleClassIdStrings.has(classId.toString())) {
+          return res.status(403).json({
+            message:
+              req.user.role === "teacher"
+                ? "Bạn không phụ trách lớp học này"
+                : "Bạn không thuộc lớp học này",
+          });
+        }
+
+        filter.classIds = classId;
+      } else {
+        filter.classIds = {
+          $in: accessibleClassIds,
         };
       }
 
       if (req.user.role === "student") {
-        const classes = await Class.find({
-          students: req.user._id,
-        }).select("_id");
-
-        filter.classId = {
-          $in: classes.map((classData) => classData._id),
-        };
+        filter.status = "published";
+      } else if (status) {
+        filter.status = status;
       }
     }
 
-    // Học sinh chỉ được xem tài liệu đã công khai
-    if (req.user.role === "student") {
-      filter.status = "published";
-    } else if (status) {
-      filter.status = status;
-    }
-
     const materials = await Material.find(filter)
-      .populate("classId", "name description")
-      .populate("teacherId", "name email")
+      .populate("classIds", "name description subject status")
+      .populate("createdBy", "name email role")
       .sort({
         createdAt: -1,
       });
@@ -295,8 +351,8 @@ const getMaterialById = async (req, res) => {
     }
 
     const material = await Material.findById(id)
-      .populate("classId", "name description teacher students")
-      .populate("teacherId", "name email");
+      .populate("classIds", "name description subject status teacher students")
+      .populate("createdBy", "name email role");
 
     if (!material) {
       return res.status(404).json({
@@ -304,41 +360,15 @@ const getMaterialById = async (req, res) => {
       });
     }
 
-    const classData = material.classId;
+    const hasAccess = await canAccessMaterial(material, req.user);
 
-    if (!classData) {
-      return res.status(404).json({
-        message: "Lớp học của tài liệu không còn tồn tại",
+    if (!hasAccess) {
+      return res.status(403).json({
+        message:
+          req.user.role === "student" && material.status !== "published"
+            ? "Tài liệu này chưa được công khai"
+            : "Bạn không có quyền xem tài liệu này",
       });
-    }
-
-    if (req.user.role === "teacher") {
-      if (
-        !classData.teacher ||
-        classData.teacher.toString() !== req.user._id.toString()
-      ) {
-        return res.status(403).json({
-          message: "Bạn không có quyền xem tài liệu này",
-        });
-      }
-    }
-
-    if (req.user.role === "student") {
-      const isStudentInClass = classData.students.some(
-        (studentId) => studentId.toString() === req.user._id.toString(),
-      );
-
-      if (!isStudentInClass) {
-        return res.status(403).json({
-          message: "Bạn không thuộc lớp học này",
-        });
-      }
-
-      if (material.status !== "published") {
-        return res.status(403).json({
-          message: "Tài liệu này chưa được công khai",
-        });
-      }
     }
 
     return res.json({
@@ -358,7 +388,8 @@ const updateMaterial = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { classId, title, description, files, links, status } = req.body;
+    const { classIds, materialType, title, description, files, links, status } =
+      req.body;
 
     if (!isValidObjectId(id)) {
       return res.status(400).json({
@@ -374,43 +405,78 @@ const updateMaterial = async (req, res) => {
       });
     }
 
-    // Kiểm tra quyền đối với lớp hiện tại
-    const currentClassAccess = await checkClassAccess(
-      material.classId,
-      req.user,
-    );
+    if (req.user.role === "teacher") {
+      if (material.materialType !== "supplementary") {
+        return res.status(403).json({
+          message: "Giáo viên không được sửa giáo trình chính thức",
+        });
+      }
 
-    if (currentClassAccess.error) {
-      return res.status(currentClassAccess.error.status).json({
-        message: currentClassAccess.error.message,
-      });
+      const currentClassResult = await getClassesByIds(material.classIds);
+
+      if (currentClassResult.error) {
+        return res.status(currentClassResult.error.status).json({
+          message: currentClassResult.error.message,
+        });
+      }
+
+      if (!teacherOwnsAllClasses(currentClassResult.classes, req.user._id)) {
+        return res.status(403).json({
+          message: "Bạn không có quyền sửa tài liệu của lớp này",
+        });
+      }
+
+      if (
+        materialType !== undefined &&
+        materialType !== material.materialType
+      ) {
+        return res.status(403).json({
+          message: "Giáo viên không được thay đổi loại tài liệu",
+        });
+      }
     }
 
-    /*
-     * Nếu thay đổi classId thì phải kiểm tra quyền
-     * đối với lớp mới.
-     */
-    if (classId && classId !== material.classId.toString()) {
-      const newClassAccess = await checkClassAccess(classId, req.user);
+    if (classIds !== undefined) {
+      const classIdsError = validateClassIds(classIds);
 
-      if (newClassAccess.error) {
-        return res.status(newClassAccess.error.status).json({
-          message: newClassAccess.error.message,
-        });
-      }
-
-      if (!newClassAccess.classData.teacher) {
+      if (classIdsError) {
         return res.status(400).json({
-          message: "Lớp học mới chưa có giáo viên phụ trách",
+          message: classIdsError,
         });
       }
 
-      material.classId = newClassAccess.classData._id;
-      material.teacherId = newClassAccess.classData.teacher;
+      const newClassResult = await getClassesByIds(classIds);
+
+      if (newClassResult.error) {
+        return res.status(newClassResult.error.status).json({
+          message: newClassResult.error.message,
+        });
+      }
+
+      if (
+        req.user.role === "teacher" &&
+        !teacherOwnsAllClasses(newClassResult.classes, req.user._id)
+      ) {
+        return res.status(403).json({
+          message: "Bạn chỉ được chuyển tài liệu sang lớp mình phụ trách",
+        });
+      }
+
+      material.classIds = newClassResult.normalizedClassIds;
+    }
+
+    if (materialType !== undefined) {
+      if (!MATERIAL_TYPES.includes(materialType)) {
+        return res.status(400).json({
+          message: "Loại tài liệu không hợp lệ",
+        });
+      }
+
+      material.materialType = materialType;
     }
 
     if (title !== undefined) {
-      if (!title || !title.trim()) {
+      if (typeof title !== "string" || !title.trim()) {
         return res.status(400).json({
           message: "Tiêu đề tài liệu không được để trống",
         });
@@ -420,9 +486,9 @@ const updateMaterial = async (req, res) => {
     }
 
     if (description !== undefined) {
-      if (!description || !description.trim()) {
+      if (typeof description !== "string") {
         return res.status(400).json({
-          message: "Mô tả tài liệu không được để trống",
+          message: "Mô tả tài liệu không hợp lệ",
         });
       }
 
@@ -462,8 +528,8 @@ const updateMaterial = async (req, res) => {
     await material.save();
 
     const updatedMaterial = await Material.findById(material._id)
-      .populate("classId", "name description")
-      .populate("teacherId", "name email");
+      .populate("classIds", "name description subject status")
+      .populate("createdBy", "name email role");
 
     return res.json({
       message: "Cập nhật tài liệu thành công",
@@ -503,12 +569,26 @@ const deleteMaterial = async (req, res) => {
       });
     }
 
-    const accessResult = await checkClassAccess(material.classId, req.user);
+    if (req.user.role === "teacher") {
+      if (material.materialType !== "supplementary") {
+        return res.status(403).json({
+          message: "Giáo viên không được xóa giáo trình chính thức",
+        });
+      }
 
-    if (accessResult.error) {
-      return res.status(accessResult.error.status).json({
-        message: accessResult.error.message,
-      });
+      const classResult = await getClassesByIds(material.classIds);
+
+      if (classResult.error) {
+        return res.status(classResult.error.status).json({
+          message: classResult.error.message,
+        });
+      }
+
+      if (!teacherOwnsAllClasses(classResult.classes, req.user._id)) {
+        return res.status(403).json({
+          message: "Bạn không có quyền xóa tài liệu của lớp này",
+        });
+      }
     }
 
     await material.deleteOne();

@@ -14,6 +14,7 @@ const {
 } = require("../controllers/classTeacher.controller");
 
 const {
+  getAvailableStudents,
   addStudentToClass,
   removeStudentFromClass,
 } = require("../controllers/classStudent.controller");
@@ -105,6 +106,14 @@ router.post(
 // QUẢN LÝ HỌC SINH TRONG LỚP
 // Admin và Teacher
 // ====================
+
+router.get(
+  "/:id/available-students",
+  requireMongoConnection,
+  authentication,
+  authorizeRoles("admin", "teacher"),
+  getAvailableStudents,
+);
 
 router.post(
   "/:id/students",

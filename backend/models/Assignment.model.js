@@ -19,6 +19,10 @@ const fileSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    size: {
+      type: Number,
+      min: 0,
+    },
   },
   {
     _id: false,
@@ -95,14 +99,12 @@ const assignmentSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Class",
       required: true,
-      
     },
 
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-     
     },
 
     title: {
@@ -148,7 +150,6 @@ const assignmentSchema = new mongoose.Schema(
     isPublished: {
       type: Boolean,
       default: true,
-      
     },
 
     allowLateSubmission: {

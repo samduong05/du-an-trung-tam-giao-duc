@@ -194,7 +194,7 @@ export default function TeacherFormModal({
         <div className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6">
           <h3
             id="teacher-modal-title"
-            className="min-w-0 wrap-break-word text-lg font-semibold leading-tight text-slate-800"
+            className="min-w-0 wrap-break-word text-lg font-semibold leading-tight text-slate-900"
           >
             {isEditMode ? "Chỉnh sửa giáo viên" : "Thêm giáo viên"}
           </h3>

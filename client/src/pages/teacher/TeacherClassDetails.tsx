@@ -1,23 +1,22 @@
 import { useState } from "react";
-import { CalendarDays, Loader2, Plus, UserRound, Users, X } from "lucide-react";
+import TeacherCreateStudentModal from "./TeacherCreateStudentModal";
+import {
+  BookOpen,
+  CalendarDays,
+  Loader2,
+  UserPlus,
+  Users,
+  X,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import {
-  useGetStudentsQuery,
-  useGetTeachersQuery,
-} from "../../store/api/endpoints";
-
-import {
   useAddStudentToClassMutation,
-  useAssignTeacherToClassMutation,
+  useGetAvailableStudentsQuery,
   useRemoveStudentFromClassMutation,
   type ClassItem,
   type DayOfWeek,
 } from "../../store/api/classesApi";
-
-interface ClassDetailsProps {
-  classItem: ClassItem;
-}
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   monday: "Thứ 2",
@@ -28,6 +27,10 @@ const DAY_LABELS: Record<DayOfWeek, string> = {
   saturday: "Thứ 7",
   sunday: "Chủ nhật",
 };
+
+interface TeacherClassDetailsProps {
+  classItem: ClassItem;
+}
 
 const getErrorMessage = (error: unknown): string | undefined => {
   if (typeof error === "object" && error !== null && "data" in error) {
@@ -43,7 +46,7 @@ const getErrorMessage = (error: unknown): string | undefined => {
   return undefined;
 };
 
-const formatDate = (date?: string) => {
+const formatDate = (date?: string): string => {
   if (!date) {
     return "—";
   }
@@ -57,70 +60,28 @@ const formatDate = (date?: string) => {
   return parsedDate.toLocaleDateString("vi-VN");
 };
 
-export default function ClassDetails({ classItem }: ClassDetailsProps) {
-  const { data: teachersData, isLoading: isLoadingTeachers } =
-    useGetTeachersQuery();
+export default function TeacherClassDetails({
+  classItem,
+}: TeacherClassDetailsProps) {
+  const {
+    data: availableStudentsData,
+    isLoading: isLoadingStudents,
+    isFetching: isFetchingStudents,
+  } = useGetAvailableStudentsQuery(classItem._id);
 
-  const { data: studentsData, isLoading: isLoadingStudents } =
-    useGetStudentsQuery();
-
-  const [assignTeacherToClass] = useAssignTeacherToClassMutation();
-
-  const [addStudentToClass] = useAddStudentToClassMutation();
+  const [addStudentToClass, { isLoading: isAddingStudent }] =
+    useAddStudentToClassMutation();
 
   const [removeStudentFromClass] = useRemoveStudentFromClassMutation();
 
-  const [selectedTeacherId, setSelectedTeacherId] = useState("");
-
   const [selectedStudentId, setSelectedStudentId] = useState("");
-
-  const [isAssigningTeacher, setIsAssigningTeacher] = useState(false);
-
-  const [isAddingStudent, setIsAddingStudent] = useState(false);
-
+  const [isCreateStudentModalOpen, setIsCreateStudentModalOpen] =
+    useState(false);
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(
     null,
   );
 
-  const teachers = teachersData?.users ?? [];
-  const students = studentsData?.users ?? [];
-
-  const availableStudents = students.filter(
-    (student) =>
-      !classItem.students.some(
-        (classStudent) => classStudent._id === student._id,
-      ),
-  );
-
-  const handleAssignTeacher = async () => {
-    if (!selectedTeacherId) {
-      toast.error("Vui lòng chọn giáo viên");
-      return;
-    }
-
-    if (selectedTeacherId === classItem.teacher?._id) {
-      toast.error("Giáo viên này đang phụ trách lớp");
-      return;
-    }
-
-    try {
-      setIsAssigningTeacher(true);
-
-      await assignTeacherToClass({
-        classId: classItem._id,
-        teacherId: selectedTeacherId,
-      }).unwrap();
-
-      toast.success("Thay giáo viên phụ trách thành công");
-      setSelectedTeacherId("");
-    } catch (error) {
-      toast.error(
-        getErrorMessage(error) ?? "Không thể thay giáo viên phụ trách",
-      );
-    } finally {
-      setIsAssigningTeacher(false);
-    }
-  };
+  const availableStudents = availableStudentsData?.students ?? [];
 
   const handleAddStudent = async () => {
     if (!selectedStudentId) {
@@ -129,19 +90,15 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
     }
 
     try {
-      setIsAddingStudent(true);
-
       await addStudentToClass({
         classId: classItem._id,
         studentId: selectedStudentId,
       }).unwrap();
 
-      toast.success("Thêm học sinh vào lớp thành công");
       setSelectedStudentId("");
+      toast.success("Thêm học sinh vào lớp thành công");
     } catch (error) {
       toast.error(getErrorMessage(error) ?? "Không thể thêm học sinh vào lớp");
-    } finally {
-      setIsAddingStudent(false);
     }
   };
 
@@ -179,7 +136,6 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-4 flex items-center gap-2">
             <CalendarDays className="h-5 w-5 text-blue-600" />
-
             <h3 className="font-semibold text-slate-900">Lịch học</h3>
           </div>
 
@@ -191,11 +147,8 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
                     <th className="px-3 py-2 font-medium">Thứ</th>
-
                     <th className="px-3 py-2 font-medium">Bắt đầu</th>
-
                     <th className="px-3 py-2 font-medium">Kết thúc</th>
-
                     <th className="px-3 py-2 font-medium">Phòng</th>
                   </tr>
                 </thead>
@@ -209,15 +162,12 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                       <td className="px-3 py-3 font-medium text-slate-900">
                         {DAY_LABELS[scheduleItem.dayOfWeek]}
                       </td>
-
                       <td className="px-3 py-3 text-slate-700">
                         {scheduleItem.startTime}
                       </td>
-
                       <td className="px-3 py-3 text-slate-700">
                         {scheduleItem.endTime}
                       </td>
-
                       <td className="px-3 py-3 text-slate-700">
                         {scheduleItem.room || "—"}
                       </td>
@@ -233,7 +183,6 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 Ngày bắt đầu
               </p>
-
               <p className="mt-1 text-sm font-medium text-slate-700">
                 {formatDate(classItem.startedAt)}
               </p>
@@ -243,7 +192,6 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
                 Ngày kết thúc
               </p>
-
               <p className="mt-1 text-sm font-medium text-slate-700">
                 {formatDate(classItem.endedAt)}
               </p>
@@ -253,61 +201,38 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
 
         <section className="rounded-xl border border-slate-200 bg-white p-4">
           <div className="mb-4 flex items-center gap-2">
-            <UserRound className="h-5 w-5 text-blue-600" />
-
-            <h3 className="font-semibold text-slate-900">
-              Giáo viên phụ trách
-            </h3>
+            <BookOpen className="h-5 w-5 text-blue-600" />
+            <h3 className="font-semibold text-slate-900">Thông tin lớp</h3>
           </div>
 
-          <div className="rounded-lg bg-slate-50 p-3">
-            <p className="font-medium text-slate-900">
-              {classItem.teacher?.name ?? "Chưa phân công"}
-            </p>
-
-            <p className="mt-1 break-all text-sm text-slate-500">
-              {classItem.teacher?.email ?? "—"}
-            </p>
-
-            <p className="mt-1 text-sm text-slate-500">
-              {classItem.teacher?.phone ?? "Chưa có số điện thoại"}
-            </p>
-          </div>
-
-          <div className="mt-4">
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Thay giáo viên
-            </label>
-
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <select
-                value={selectedTeacherId}
-                onChange={(event) => setSelectedTeacherId(event.target.value)}
-                disabled={isLoadingTeachers}
-                className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 caret-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-              >
-                <option value="">Chọn giáo viên</option>
-
-                {teachers.map((teacher) => (
-                  <option key={teacher._id} value={teacher._id}>
-                    {teacher.name} — {teacher.email}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={handleAssignTeacher}
-                disabled={isAssigningTeacher || isLoadingTeachers}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isAssigningTeacher && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Cập nhật
-              </button>
+          <dl className="space-y-4">
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Tên lớp
+              </dt>
+              <dd className="mt-1 text-sm font-medium text-slate-900">
+                {classItem.name}
+              </dd>
             </div>
-          </div>
+
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Môn học
+              </dt>
+              <dd className="mt-1 text-sm font-medium text-slate-900">
+                {classItem.subject}
+              </dd>
+            </div>
+
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                Mô tả
+              </dt>
+              <dd className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                {classItem.description || "Không có mô tả"}
+              </dd>
+            </div>
+          </dl>
         </section>
       </div>
 
@@ -315,50 +240,62 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-blue-600" />
-
             <h3 className="font-semibold text-slate-900">Danh sách học sinh</h3>
-
             <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
               {classItem.students.length}
             </span>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <select
-              value={selectedStudentId}
-              onChange={(event) => setSelectedStudentId(event.target.value)}
-              disabled={isLoadingStudents || availableStudents.length === 0}
-              className="min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 caret-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-            >
-              <option value="">
-                {availableStudents.length === 0
-                  ? "Không còn học sinh để thêm"
-                  : "Chọn học sinh"}
-              </option>
-
-              {availableStudents.map((student) => (
-                <option key={student._id} value={student._id}>
-                  {student.name} — {student.email}
+          <div className="flex min-w-0 flex-col gap-2 lg:w-2/3">
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row">
+              <select
+                value={selectedStudentId}
+                onChange={(event) => setSelectedStudentId(event.target.value)}
+                disabled={
+                  isLoadingStudents ||
+                  isFetchingStudents ||
+                  isAddingStudent ||
+                  availableStudents.length === 0
+                }
+                className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+              >
+                <option value="">
+                  {isLoadingStudents || isFetchingStudents
+                    ? "Đang tải học sinh..."
+                    : availableStudents.length === 0
+                      ? "Không còn học sinh có sẵn"
+                      : "Chọn học sinh có sẵn"}
                 </option>
-              ))}
-            </select>
+
+                {availableStudents.map((student) => (
+                  <option key={student._id} value={student._id}>
+                    {student.name} — {student.email}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={handleAddStudent}
+                disabled={!selectedStudentId || isAddingStudent}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isAddingStudent ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <UserPlus className="h-4 w-4" />
+                )}
+                Thêm học sinh
+              </button>
+            </div>
 
             <button
               type="button"
-              onClick={handleAddStudent}
-              disabled={
-                isAddingStudent ||
-                isLoadingStudents ||
-                availableStudents.length === 0
-              }
-              className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              onClick={() => setIsCreateStudentModalOpen(true)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-green-600 bg-white px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-50"
             >
-              {isAddingStudent ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="mr-2 h-4 w-4" />
-              )}
-              Thêm học sinh
+              <UserPlus className="h-4 w-4" />
+              Tạo học sinh mới
             </button>
           </div>
         </div>
@@ -366,7 +303,6 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
         {classItem.students.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 px-4 py-8 text-center">
             <Users className="mx-auto h-8 w-8 text-slate-400" />
-
             <p className="mt-2 text-sm text-slate-500">Lớp chưa có học sinh</p>
           </div>
         ) : (
@@ -375,14 +311,11 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
               <table className="w-full table-fixed text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
-                    <th className="w-[30%] px-3 py-2 font-medium">Họ và tên</th>
-
-                    <th className="w-[32%] px-3 py-2 font-medium">Email</th>
-
+                    <th className="w-[28%] px-3 py-2 font-medium">Họ và tên</th>
+                    <th className="w-[34%] px-3 py-2 font-medium">Email</th>
                     <th className="w-[22%] px-3 py-2 font-medium">
                       Số điện thoại
                     </th>
-
                     <th className="w-[16%] px-3 py-2 text-right font-medium">
                       Thao tác
                     </th>
@@ -398,15 +331,12 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                       <td className="truncate px-3 py-3 font-medium text-slate-900">
                         {student.name}
                       </td>
-
                       <td className="truncate px-3 py-3 text-slate-700">
                         {student.email}
                       </td>
-
                       <td className="truncate px-3 py-3 text-slate-700">
                         {student.phone || "—"}
                       </td>
-
                       <td className="px-3 py-3 text-right">
                         <button
                           type="button"
@@ -414,12 +344,12 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                             handleRemoveStudent(student._id, student.name)
                           }
                           disabled={removingStudentId === student._id}
-                          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           {removingStudentId === student._id ? (
-                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <X className="h-3.5 w-3.5" />
+                            <X className="h-4 w-4" />
                           )}
                           Gỡ khỏi lớp
                         </button>
@@ -437,11 +367,9 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                   className="rounded-lg border border-slate-200 p-3"
                 >
                   <p className="font-medium text-slate-900">{student.name}</p>
-
                   <p className="mt-1 break-all text-sm text-slate-500">
                     {student.email}
                   </p>
-
                   <p className="mt-1 text-sm text-slate-500">
                     {student.phone || "Chưa có số điện thoại"}
                   </p>
@@ -452,12 +380,12 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
                       handleRemoveStudent(student._id, student.name)
                     }
                     disabled={removingStudentId === student._id}
-                    className="mt-3 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {removingStudentId === student._id ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-4 w-4" />
                     )}
                     Gỡ khỏi lớp
                   </button>
@@ -467,6 +395,11 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
           </>
         )}
       </section>
+      <TeacherCreateStudentModal
+        isOpen={isCreateStudentModalOpen}
+        classId={classItem._id}
+        onClose={() => setIsCreateStudentModalOpen(false)}
+      />
     </div>
   );
 }

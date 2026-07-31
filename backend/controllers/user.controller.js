@@ -13,26 +13,28 @@ const isStudentOfTeacher = async (teacherId, studentId) => {
 };
 
 // POST /api/v1/users
+// POST /api/v1/users
 const createUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, phone } = req.body;
 
-    if (!name || !email || !password || !role) {
+    const role = req.user.role === "teacher" ? "student" : req.body.role;
+
+    if (!name || !email || !password) {
       return res.status(400).json({
-        message: "Vui lòng nhập đầy đủ name, email, password, role",
+        message: "Vui lòng nhập đầy đủ name, email và password",
+      });
+    }
+
+    if (req.user.role === "admin" && !role) {
+      return res.status(400).json({
+        message: "Vui lòng chọn role",
       });
     }
 
     if (!["teacher", "student"].includes(role)) {
       return res.status(400).json({
         message: "Chỉ được tạo teacher hoặc student",
-      });
-    }
-
-    // Teacher chỉ được tạo student
-    if (req.user.role === "teacher" && role !== "student") {
-      return res.status(403).json({
-        message: "Teacher chỉ được tạo tài khoản student",
       });
     }
 
@@ -55,30 +57,44 @@ const createUser = async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role,
-      phone,
+      phone: typeof phone === "string" ? phone.trim() : phone,
       createdBy: req.user._id,
     });
 
     return res.status(201).json({
-      message: "Tạo user thành công",
+      message:
+        req.user.role === "teacher"
+          ? "Tạo học sinh thành công"
+          : "Tạo user thành công",
       user: {
-        id: user._id,
+        _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         phone: user.phone,
+        isActive: user.isActive,
         createdBy: user.createdBy,
       },
     });
   } catch (error) {
     console.error("Lỗi tạo user:", error);
 
+    if (error?.code === 11000) {
+      const duplicatedField = Object.keys(error.keyPattern || {})[0];
+
+      return res.status(400).json({
+        message:
+          duplicatedField === "phone"
+            ? "Số điện thoại đã tồn tại"
+            : "Thông tin tài khoản đã tồn tại",
+      });
+    }
+
     return res.status(500).json({
       message: "Lỗi server",
     });
   }
 };
-
 // GET /api/v1/users
 const getUsers = async (req, res) => {
   try {

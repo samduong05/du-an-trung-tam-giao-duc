@@ -11,7 +11,6 @@ export interface AuthUser {
   email: string;
   phone?: string;
   role: "admin" | "teacher" | "student";
-  isActive: boolean;
 }
 
 export interface LoginResponse {
@@ -27,7 +26,25 @@ export interface GetMeResponse {
 export interface MessageResponse {
   message: string;
 }
+export interface CreateStudentInput {
+  name: string;
+  email: string;
+  password: string;
+  role: "student";
+  phone?: string;
+}
 
+export interface CreateStudentResponse {
+  message: string;
+  user: {
+    _id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    role: "student";
+    isActive: boolean;
+  };
+}
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     login: builder.mutation<LoginResponse, LoginInput>({
@@ -166,16 +183,7 @@ export const usersApi = apiSlice.injectEndpoints({
       }),
       providesTags: ["Users"],
     }),
-    createStudent: builder.mutation<
-      { message: string; user: any },
-      {
-        name: string;
-        email: string;
-        password: string;
-        role: "student";
-        phone?: string;
-      }
-    >({
+    createStudent: builder.mutation<CreateStudentResponse, CreateStudentInput>({
       query: (body) => ({
         url: "/users",
         method: "POST",

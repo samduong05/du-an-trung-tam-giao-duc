@@ -109,7 +109,20 @@ export interface RemoveStudentFromClassInput {
   classId: string;
   studentId: string;
 }
+export interface AvailableStudent {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: "student";
+  isActive: boolean;
+}
 
+export interface GetAvailableStudentsResponse {
+  message: string;
+  count: number;
+  students: AvailableStudent[];
+}
 export const classesApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
     getClasses: builder.query<GetClassesResponse, GetClassesParams | void>({
@@ -130,7 +143,15 @@ export const classesApi = apiSlice.injectEndpoints({
         { type: "Classes", id: classId },
       ],
     }),
-
+    getAvailableStudents: builder.query<GetAvailableStudentsResponse, string>({
+      query: (classId) => ({
+        url: `/classes/${classId}/available-students`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, classId) => [
+        { type: "Classes", id: `AVAILABLE-${classId}` },
+      ],
+    }),
     createClass: builder.mutation<GetClassResponse, CreateClassInput>({
       query: (body) => ({
         url: "/classes",
@@ -202,6 +223,7 @@ export const classesApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, { classId }) => [
         "Classes",
         { type: "Classes", id: classId },
+        { type: "Classes", id: `AVAILABLE-${classId}` },
       ],
     }),
 
@@ -215,7 +237,7 @@ export const classesApi = apiSlice.injectEndpoints({
       }),
       invalidatesTags: (_result, _error, { classId }) => [
         "Classes",
-        { type: "Classes", id: classId },
+        { type: "Classes", id: `AVAILABLE-${classId}` },
       ],
     }),
   }),
@@ -225,6 +247,7 @@ export const {
   useGetClassesQuery,
   useGetClassByIdQuery,
   useLazyGetClassByIdQuery,
+  useGetAvailableStudentsQuery,
   useCreateClassMutation,
   useUpdateClassMutation,
   useUpdateClassStatusMutation,

@@ -69,10 +69,10 @@ const getStatusClassName = (status: ClassStatus) => {
       return "bg-amber-50 text-amber-700 ring-amber-600/20";
 
     case "completed":
-      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+      return "bg-slate-100 text-slate-700 ring-slate-500/20";
 
     default:
-      return "bg-slate-100 text-slate-600 ring-slate-500/20";
+      return "bg-slate-100 text-slate-700 ring-slate-500/20";
   }
 };
 
@@ -85,7 +85,7 @@ const getStatusSelectClassName = (status: ClassStatus) => {
       return "border-amber-200 bg-amber-50 text-amber-700";
 
     case "completed":
-      return "border-slate-200 bg-slate-100 text-slate-600";
+      return "border-slate-200 bg-slate-100 text-slate-700";
 
     default:
       return "border-slate-300 bg-white text-slate-700";
@@ -184,7 +184,7 @@ export default function ClassesPage() {
   const renderStatusBadge = (status: ClassStatus) => {
     return (
       <span
-        className={`inline-flex min-w-[116px] justify-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusClassName(
+        className={`inline-flex min-w-28 justify-center rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${getStatusClassName(
           status,
         )}`}
       >
@@ -214,7 +214,7 @@ export default function ClassesPage() {
     return (
       <div className="flex min-h-80 items-center justify-center p-4">
         <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-          <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
+          <BookOpen className="mx-auto h-10 w-10 text-slate-400" />
 
           <h2 className="mt-4 font-semibold text-slate-900">
             Không thể tải danh sách lớp
@@ -257,10 +257,9 @@ export default function ClassesPage() {
         </button>
       </header>
 
-
       {classes.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-16 text-center">
-          <BookOpen className="mx-auto h-12 w-12 text-slate-300" />
+          <BookOpen className="mx-auto h-12 w-12 text-slate-400" />
 
           <h2 className="mt-4 font-semibold text-slate-900">Chưa có lớp học</h2>
 
@@ -330,12 +329,12 @@ export default function ClassesPage() {
                           </button>
                         </td>
 
-                        <td className="truncate px-5 py-4 text-sm text-slate-600">
+                        <td className="truncate px-5 py-4 text-sm text-slate-700">
                           {classItem.subject}
                         </td>
 
                         <td className="px-5 py-4">
-                          <p className="truncate text-sm font-medium text-slate-800">
+                          <p className="truncate text-sm font-medium text-slate-900">
                             {classItem.teacher?.name ?? "Chưa phân công"}
                           </p>
 
@@ -352,7 +351,7 @@ export default function ClassesPage() {
                         </td>
 
                         <td className="px-5 py-4 text-center">
-                          <div className="relative mx-auto w-[145px]">
+                          <div className="relative mx-auto w-36">
                             <select
                               value={classItem.status}
                               disabled={updatingStatusId === classItem._id}
@@ -378,7 +377,9 @@ export default function ClassesPage() {
                                 classItem.status,
                               )
                                 .split(" ")
-                                .find((className) => className.startsWith("text-"))}`}
+                                .find((className) =>
+                                  className.startsWith("text-"),
+                                )}`}
                             />
                           </div>
                         </td>
@@ -502,7 +503,9 @@ export default function ClassesPage() {
                             classItem.status,
                           )
                             .split(" ")
-                            .find((className) => className.startsWith("text-"))}`}
+                            .find((className) =>
+                              className.startsWith("text-"),
+                            )}`}
                         />
                       </div>
                     </div>
@@ -525,7 +528,7 @@ export default function ClassesPage() {
                       <button
                         type="button"
                         onClick={() => openEditModal(classItem)}
-                        className="rounded-lg border border-slate-300 p-2 text-slate-600 transition hover:bg-blue-50 hover:text-blue-600"
+                        className="rounded-lg border border-slate-300 p-2 text-slate-700 transition hover:bg-blue-50 hover:text-blue-600"
                         title="Sửa lớp"
                       >
                         <Pencil className="h-4 w-4" />
@@ -535,7 +538,7 @@ export default function ClassesPage() {
                         type="button"
                         disabled={deletingClassId === classItem._id}
                         onClick={() => handleDeleteClass(classItem)}
-                        className="rounded-lg border border-slate-300 p-2 text-slate-600 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-lg border border-slate-300 p-2 text-slate-700 transition hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-50"
                         title="Xóa lớp"
                       >
                         {deletingClassId === classItem._id ? (

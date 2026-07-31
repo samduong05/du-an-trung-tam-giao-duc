@@ -19,6 +19,12 @@ const fileSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+
+    size: {
+      type: Number,
+      min: 0,
+      default: 0,
+    },
   },
   {
     _id: false,
@@ -46,16 +52,31 @@ const linkSchema = new mongoose.Schema(
 
 const materialSchema = new mongoose.Schema(
   {
-    classId: {
+    classIds: {
+      type: [
+        {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Class",
+        },
+      ],
+      required: true,
+      validate: {
+        validator: (classIds) =>
+          Array.isArray(classIds) && classIds.length > 0,
+        message: "Tài liệu phải thuộc ít nhất một lớp học",
+      },
+    },
+
+    createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Class",
+      ref: "User",
       required: true,
       index: true,
     },
 
-    teacherId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+    materialType: {
+      type: String,
+      enum: ["curriculum", "supplementary"],
       required: true,
       index: true,
     },
@@ -68,8 +89,8 @@ const materialSchema = new mongoose.Schema(
 
     description: {
       type: String,
-      required: true,
       trim: true,
+      default: "",
     },
 
     files: {
@@ -86,6 +107,7 @@ const materialSchema = new mongoose.Schema(
       type: String,
       enum: ["published", "hidden"],
       default: "published",
+      index: true,
     },
   },
   {
@@ -94,12 +116,15 @@ const materialSchema = new mongoose.Schema(
 );
 
 materialSchema.index({
-  classId: 1,
+  classIds: 1,
+  materialType: 1,
+  status: 1,
   createdAt: -1,
 });
 
 materialSchema.index({
-  teacherId: 1,
+  createdBy: 1,
+  materialType: 1,
   createdAt: -1,
 });
 

@@ -121,7 +121,7 @@ export default function TeachersPage() {
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 sm:text-2xl">
+          <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
             Danh sách giáo viên
           </h1>
 
@@ -148,7 +148,7 @@ export default function TeachersPage() {
 
       <div className="overflow-hidden rounded-lg bg-white shadow-sm">
         {isLoading ? (
-          <div className="py-8 text-center text-slate-600">
+          <div className="py-8 text-center text-slate-700">
             Đang tải dữ liệu...
           </div>
         ) : error ? (
@@ -156,7 +156,7 @@ export default function TeachersPage() {
             Có lỗi xảy ra khi tải dữ liệu.
           </div>
         ) : !data?.users?.length ? (
-          <div className="py-8 text-center text-slate-600">
+          <div className="py-8 text-center text-slate-700">
             Không có giáo viên.
           </div>
         ) : (
@@ -262,7 +262,7 @@ export default function TeachersPage() {
                       </td>
 
                       <td
-                        className="truncate px-4 py-3 text-sm font-medium text-slate-800"
+                        className="truncate px-4 py-3 text-sm font-medium text-slate-900"
                         title={teacher.name}
                       >
                         {teacher.name}

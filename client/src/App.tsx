@@ -1,10 +1,5 @@
 import type { ReactNode } from "react";
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useSelector } from "react-redux";
 
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -14,6 +9,15 @@ import LoginPage from "./pages/auth/LoginPage";
 import TeachersPage from "./pages/admin/TeachersPage";
 import StudentsPage from "./pages/admin/StudentsPage";
 import ClassesPage from "./pages/admin/ClassesPage";
+import AdminMaterialsPage from "./pages/admin/materials/AdminMaterialsPage";
+
+import TeacherClassesPage from "./pages/teacher/TeacherClassesPage";
+import TeacherAttendancePage from "./pages/teacher/TeacherAttendancePage";
+import TeacherAttendanceDetailPage from "./pages/teacher/TeacherAttendanceDetailPage";
+import TeacherAssignmentsPage from "./pages/teacher/TeacherAssignmentsPage";
+import TeacherAssignmentDetailPage from "./pages/teacher/TeacherAssignmentDetailPage";
+import TeacherMaterialsPage from "./pages/teacher/TeacherMaterialsPage";
+import TeacherMaterialDetailPage from "./pages/teacher/materials/TeacherMaterialDetailPage";
 
 import AdminDashboard from "./pages/dashboards/AdminDashboard";
 import TeacherDashboard from "./pages/dashboards/TeacherDashboard";
@@ -32,10 +36,7 @@ interface ProtectedRouteProps {
   allowedRoles: UserRole[];
 }
 
-function ProtectedRoute({
-  children,
-  allowedRoles,
-}: ProtectedRouteProps) {
+function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const user = useSelector(selectCurrentUser);
   const role = useSelector(selectUserRole);
   const isAuthenticated = useSelector(selectIsAuthenticated);
@@ -60,15 +61,9 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route
-          path="/"
-          element={<Navigate to="/auth/login" replace />}
-        />
+        <Route path="/" element={<Navigate to="/auth/login" replace />} />
 
-        <Route
-          path="/auth/login"
-          element={<LoginPage />}
-        />
+        <Route path="/auth/login" element={<LoginPage />} />
 
         <Route element={<DashboardLayout />}>
           {/* Admin routes */}
@@ -108,12 +103,84 @@ function App() {
             }
           />
 
+          <Route
+            path="/admin/materials"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminMaterialsPage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Teacher routes */}
           <Route
             path="/teacher"
             element={
               <ProtectedRoute allowedRoles={["teacher"]}>
                 <TeacherDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/classes"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherClassesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/assignments"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherAssignmentsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/classes/:classId/assignments"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherAssignmentDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/attendance"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherAttendancePage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/attendance/:classId"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherAttendanceDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/materials"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherMaterialsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/materials/:classId"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherMaterialDetailPage />
               </ProtectedRoute>
             }
           />
@@ -129,10 +196,7 @@ function App() {
           />
         </Route>
 
-        <Route
-          path="*"
-          element={<Navigate to="/auth/login" replace />}
-        />
+        <Route path="*" element={<Navigate to="/auth/login" replace />} />
       </Routes>
     </BrowserRouter>
   );

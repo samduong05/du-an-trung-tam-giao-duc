@@ -143,7 +143,7 @@ export default function StudentsPage() {
     <div className="w-full min-w-0">
       <div className="mb-6 flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 flex-1">
-          <h1 className="break-words text-xl font-bold leading-tight text-slate-800 sm:text-2xl">
+          <h1 className="break-words text-xl font-bold leading-tight text-slate-900 sm:text-2xl">
             Danh sách học sinh
           </h1>
 
@@ -171,7 +171,7 @@ export default function StudentsPage() {
 
       <div className="overflow-hidden rounded-lg bg-white shadow-sm">
         {isLoading ? (
-          <div className="py-8 text-center text-slate-600">
+          <div className="py-8 text-center text-slate-700">
             Đang tải dữ liệu...
           </div>
         ) : error ? (
@@ -179,7 +179,7 @@ export default function StudentsPage() {
             Có lỗi xảy ra khi tải dữ liệu.
           </div>
         ) : !sortedStudents.length ? (
-          <div className="py-8 text-center text-slate-600">
+          <div className="py-8 text-center text-slate-700">
             Không có học sinh.
           </div>
         ) : (
@@ -254,7 +254,7 @@ export default function StudentsPage() {
             </div>
 
             <div className="hidden w-full overflow-x-auto xl:block">
-              <table className="min-w-[1100px] w-full table-fixed">
+              <table className="min-w-275 w-full table-fixed">
                 <colgroup>
                   <col className="w-[5%]" />
                   <col className="w-[20%]" />
@@ -283,7 +283,7 @@ export default function StudentsPage() {
                         {startIndex + index + 1}
                       </td>
                       <td
-                        className="truncate px-4 py-3 text-sm font-medium text-slate-800"
+                        className="truncate px-4 py-3 text-sm font-medium text-slate-900"
                         title={student.name}
                       >
                         {student.name}
