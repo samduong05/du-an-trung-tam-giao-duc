@@ -6,7 +6,7 @@ export interface LoginInput {
 }
 
 export interface AuthUser {
-  _id: string;
+  id: string;
   name: string;
   email: string;
   phone?: string;
@@ -15,7 +15,7 @@ export interface AuthUser {
 
 export interface LoginResponse {
   message: string;
-  accessToken: string;
+  token: string;
   user: AuthUser;
 }
 
@@ -44,6 +44,22 @@ export interface CreateStudentResponse {
     role: "student";
     isActive: boolean;
   };
+}
+
+export interface DashboardUser {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: "teacher" | "student";
+  isActive: boolean;
+  createdAt?: string;
+}
+
+export interface GetAllUsersResponse {
+  message: string;
+  count: number;
+  users: DashboardUser[];
 }
 export const authApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
@@ -126,6 +142,13 @@ export interface GetStudentsResponse {
 
 export const usersApi = apiSlice.injectEndpoints({
   endpoints: (builder) => ({
+    getUsers: builder.query<GetAllUsersResponse, void>({
+      query: () => ({
+        url: "/users",
+        method: "GET",
+      }),
+      providesTags: ["Users"],
+    }),
     // Specific endpoint to fetch teachers using backend's ?role=teacher query
     getTeachers: builder.query<GetUsersResponse, void>({
       query: () => ({
@@ -231,6 +254,7 @@ export const usersApi = apiSlice.injectEndpoints({
 });
 
 export const {
+  useGetUsersQuery,
   useGetTeachersQuery,
   useCreateTeacherMutation,
   useUpdateTeacherStatusMutation,

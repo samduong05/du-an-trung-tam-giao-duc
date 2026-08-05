@@ -17,6 +17,43 @@ export interface ClassSchedule {
   endTime: string;
   room?: string;
 }
+export type ScheduleConflictType = "teacher" | "student" | "room";
+
+export interface ScheduleConflict {
+  id: string;
+  type: ScheduleConflictType;
+
+  personId?: string;
+  personName?: string;
+  personEmail?: string;
+
+  conflictingClassId: string;
+  conflictingClassName: string;
+
+  teacherId?: string;
+  teacherName?: string;
+  teacherEmail?: string;
+
+  dayOfWeek: DayOfWeek;
+
+  startTime: string;
+  endTime: string;
+
+  requestedStartTime?: string;
+  requestedEndTime?: string;
+
+  conflictingStartTime?: string;
+  conflictingEndTime?: string;
+
+  room?: string;
+}
+
+export interface ScheduleConflictResponse {
+  message: string;
+  requiresConfirmation: true;
+  conflictCount: number;
+  conflicts: ScheduleConflict[];
+}
 
 export interface ClassTeacher {
   _id: string;
@@ -60,6 +97,17 @@ export interface GetClassResponse {
   class: ClassItem;
 }
 
+export interface GetMyClassesResponse {
+  message: string;
+  count: number;
+  classes: ClassItem[];
+}
+
+export interface GetMyClassResponse {
+  message: string;
+  class: ClassItem;
+}
+
 export interface GetClassesParams {
   status?: ClassStatus;
   search?: string;
@@ -75,6 +123,7 @@ export interface CreateClassInput {
   status?: ClassStatus;
   startedAt?: string;
   endedAt?: string;
+  forceSave?: boolean;
 }
 
 export interface UpdateClassInput {
@@ -88,6 +137,7 @@ export interface UpdateClassInput {
   status?: ClassStatus;
   startedAt?: string;
   endedAt?: string;
+  forceSave?: boolean;
 }
 
 export interface UpdateClassStatusInput {
@@ -98,11 +148,13 @@ export interface UpdateClassStatusInput {
 export interface AssignTeacherInput {
   classId: string;
   teacherId: string;
+  forceSave?: boolean;
 }
 
 export interface AddStudentToClassInput {
   classId: string;
   studentId: string;
+  forceSave?: boolean;
 }
 
 export interface RemoveStudentFromClassInput {
@@ -143,6 +195,26 @@ export const classesApi = apiSlice.injectEndpoints({
         { type: "Classes", id: classId },
       ],
     }),
+
+    getMyClasses: builder.query<GetMyClassesResponse, GetClassesParams | void>({
+      query: (params) => ({
+        url: "/classes/my-classes",
+        method: "GET",
+        params: params ?? undefined,
+      }),
+      providesTags: ["Classes"],
+    }),
+
+    getMyClassById: builder.query<GetMyClassResponse, string>({
+      query: (classId) => ({
+        url: `/classes/my-classes/${classId}`,
+        method: "GET",
+      }),
+      providesTags: (_result, _error, classId) => [
+        { type: "Classes", id: `MY-CLASS-${classId}` },
+      ],
+    }),
+
     getAvailableStudents: builder.query<GetAvailableStudentsResponse, string>({
       query: (classId) => ({
         url: `/classes/${classId}/available-students`,
@@ -200,10 +272,11 @@ export const classesApi = apiSlice.injectEndpoints({
       GetClassResponse,
       AssignTeacherInput
     >({
-      query: ({ classId, teacherId }) => ({
+      query: ({ classId, teacherId, forceSave }) => ({
         url: `/classes/${classId}/teachers`,
         method: "POST",
         body: { teacherId },
+        forceSave,
       }),
       invalidatesTags: (_result, _error, { classId }) => [
         "Classes",
@@ -215,10 +288,11 @@ export const classesApi = apiSlice.injectEndpoints({
       GetClassResponse,
       AddStudentToClassInput
     >({
-      query: ({ classId, studentId }) => ({
+      query: ({ classId, studentId, forceSave }) => ({
         url: `/classes/${classId}/students`,
         method: "POST",
         body: { studentId },
+        forceSave,
       }),
       invalidatesTags: (_result, _error, { classId }) => [
         "Classes",
@@ -247,6 +321,8 @@ export const {
   useGetClassesQuery,
   useGetClassByIdQuery,
   useLazyGetClassByIdQuery,
+  useGetMyClassesQuery,
+  useGetMyClassByIdQuery,
   useGetAvailableStudentsQuery,
   useCreateClassMutation,
   useUpdateClassMutation,

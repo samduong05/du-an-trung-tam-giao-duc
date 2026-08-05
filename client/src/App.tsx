@@ -10,18 +10,28 @@ import TeachersPage from "./pages/admin/TeachersPage";
 import StudentsPage from "./pages/admin/StudentsPage";
 import ClassesPage from "./pages/admin/ClassesPage";
 import AdminMaterialsPage from "./pages/admin/materials/AdminMaterialsPage";
+import AdminDailySchedulePage from "./pages/admin/AdminDailySchedulePage";
 
 import TeacherClassesPage from "./pages/teacher/TeacherClassesPage";
+import TeacherSchedulePage from "./pages/teacher/TeacherSchedulePage";
 import TeacherAttendancePage from "./pages/teacher/TeacherAttendancePage";
 import TeacherAttendanceDetailPage from "./pages/teacher/TeacherAttendanceDetailPage";
 import TeacherAssignmentsPage from "./pages/teacher/TeacherAssignmentsPage";
 import TeacherAssignmentDetailPage from "./pages/teacher/TeacherAssignmentDetailPage";
 import TeacherMaterialsPage from "./pages/teacher/TeacherMaterialsPage";
 import TeacherMaterialDetailPage from "./pages/teacher/materials/TeacherMaterialDetailPage";
+import TeacherAssignmentSubmissionsPage from "./pages/teacher/TeacherAssignmentSubmissionsPage";
 
 import AdminDashboard from "./pages/dashboards/AdminDashboard";
 import TeacherDashboard from "./pages/dashboards/TeacherDashboard";
 import StudentDashboard from "./pages/dashboards/StudentDashboard";
+import StudentClassesPage from "./pages/student/StudentClassesPage";
+import StudentClassDetailPage from "./pages/student/StudentClassDetailPage";
+import StudentAssignmentsPage from "./pages/student/StudentAssignmentsPage";
+import StudentAssignmentDetailPage from "./pages/student/StudentAssignmentDetailPage";
+
+import StudentAttendanceReportPage from "./pages/attendance/StudentAttendanceReportPage";
+import ClassAttendanceReportPage from "./pages/attendance/ClassAttendanceReportPage";
 
 import {
   selectAuthLoading,
@@ -102,7 +112,22 @@ function App() {
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/admin/schedule"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <AdminDailySchedulePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/attendance"
+            element={
+              <ProtectedRoute allowedRoles={["admin"]}>
+                <ClassAttendanceReportPage />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/materials"
             element={
@@ -118,6 +143,15 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["teacher"]}>
                 <TeacherDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/teacher/schedule"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <TeacherSchedulePage />
               </ProtectedRoute>
             }
           />
@@ -139,12 +173,27 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/teacher/classes/:classId/assignments"
             element={
               <ProtectedRoute allowedRoles={["teacher"]}>
                 <TeacherAssignmentDetailPage />
+              </ProtectedRoute>
+            }
+          />
+            <Route
+              path="/teacher/assignments/:assignmentId/submissions"
+              element={
+                <ProtectedRoute allowedRoles={["teacher"]}>
+                  <TeacherAssignmentSubmissionsPage />
+                </ProtectedRoute>
+              }
+            />
+          <Route
+            path="/teacher/classes/:classId/students/:studentId/attendance"
+            element={
+              <ProtectedRoute allowedRoles={["teacher"]}>
+                <StudentAttendanceReportPage />
               </ProtectedRoute>
             }
           />
@@ -191,6 +240,55 @@ function App() {
             element={
               <ProtectedRoute allowedRoles={["student"]}>
                 <StudentDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/classes"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentClassesPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/student/classes/:classId"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentClassDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/classes/:classId/assignments"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentAssignmentsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/classes/:classId/assignments/:assignmentId"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentAssignmentDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student/classes/:classId/attendance"
+            element={
+              <ProtectedRoute allowedRoles={["student"]}>
+                <StudentAttendanceReportPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/attendance/reports/students/:studentId"
+            element={
+              <ProtectedRoute allowedRoles={["admin", "teacher"]}>
+                <StudentAttendanceReportPage />
               </ProtectedRoute>
             }
           />

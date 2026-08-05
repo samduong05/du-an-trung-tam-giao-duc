@@ -3,11 +3,13 @@ const express = require("express");
 const {
   uploadMaterialFiles: handleUploadMaterialFiles,
   uploadAssignmentFiles: handleUploadAssignmentFiles,
+  uploadAssignmentSubmissionFiles: handleUploadAssignmentSubmissionFiles,
 } = require("../controllers/upload.controller");
 
 const {
   uploadMaterialFiles,
   uploadAssignmentFiles,
+  uploadAssignmentSubmissionFiles,
 } = require("../middlewares/upload.middleware");
 
 const {
@@ -33,6 +35,13 @@ router.post(
   authorizeRoles("admin", "teacher"),
   uploadAssignmentFiles,
   handleUploadAssignmentFiles,
+);
+// POST /api/v1/uploads/assignment-submissions
+router.post(
+  "/assignment-submissions",
+  authorizeRoles("student"),
+  uploadAssignmentSubmissionFiles,
+  handleUploadAssignmentSubmissionFiles,
 );
 
 module.exports = router;

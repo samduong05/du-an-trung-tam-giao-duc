@@ -5,6 +5,7 @@ const multer = require("multer");
 const {
   materialUploadsDir,
   assignmentUploadsDir,
+  assignmentSubmissionUploadsDir,
   quizSourceUploadsDir,
 } = require("../config/upload");
 
@@ -13,6 +14,9 @@ const MATERIAL_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const ASSIGNMENT_MAX_FILES = 5;
 const ASSIGNMENT_MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+const ASSIGNMENT_SUBMISSION_MAX_FILES = 5;
+const ASSIGNMENT_SUBMISSION_MAX_FILE_SIZE = 10 * 1024 * 1024;
 
 const QUIZ_SOURCE_MAX_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -124,6 +128,21 @@ const assignmentUpload = multer({
       "File bài tập chỉ hỗ trợ PDF, DOC, DOCX, PPT, PPTX, TXT, JPG, JPEG, PNG hoặc WEBP",
   }),
 });
+const assignmentSubmissionUpload = multer({
+  storage: createStorage(assignmentSubmissionUploadsDir),
+
+  limits: {
+    fileSize: ASSIGNMENT_SUBMISSION_MAX_FILE_SIZE,
+    files: ASSIGNMENT_SUBMISSION_MAX_FILES,
+  },
+
+  fileFilter: createFileFilter({
+    allowedExtensions: materialExtensions,
+    allowedMimeTypes: materialMimeTypes,
+    invalidMessage:
+      "File bài nộp chỉ hỗ trợ PDF, DOC, DOCX, PPT, PPTX, TXT, JPG, JPEG, PNG hoặc WEBP",
+  }),
+});
 
 const quizSourceUpload = multer({
   storage: createStorage(quizSourceUploadsDir),
@@ -146,11 +165,16 @@ const uploadAssignmentFiles = assignmentUpload.array(
   "files",
   ASSIGNMENT_MAX_FILES,
 );
-
+const uploadAssignmentSubmissionFiles = assignmentSubmissionUpload.array(
+  "files",
+  ASSIGNMENT_SUBMISSION_MAX_FILES,
+);
 const uploadQuizSource = quizSourceUpload.single("file");
 
 module.exports = {
   uploadMaterialFiles,
   uploadAssignmentFiles,
+  uploadAssignmentSubmissionFiles,
   uploadQuizSource,
 };
+

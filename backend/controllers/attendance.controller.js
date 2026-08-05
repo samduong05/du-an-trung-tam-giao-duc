@@ -37,10 +37,9 @@ const calculateReportSummary = (details) => {
     total: details.length,
 
     present: details.filter((item) => item.status === "present").length,
-
-    absent: details.filter((item) => item.status === "absent").length,
-
     late: details.filter((item) => item.status === "late").length,
+    excused: details.filter((item) => item.status === "excused").length,
+    absent: details.filter((item) => item.status === "absent").length,
   };
 };
 
@@ -107,7 +106,7 @@ const markAttendance = async (req, res) => {
       });
     }
 
-    const allowedStatuses = ["present", "absent", "late"];
+    const allowedStatuses = ["present", "late", "excused", "absent"];
 
     const invalidStatusRecord = records.find(
       (record) => record.status && !allowedStatuses.includes(record.status),
@@ -339,7 +338,7 @@ const finalizeAttendance = async (req, res) => {
 const getStudentAttendanceReport = async (req, res) => {
   try {
     const { studentId } = req.params;
-    const { from, to } = req.query;
+    const { from, to, classId } = req.query;
 
     const student = await User.findById(studentId).select("-password");
 
@@ -365,11 +364,58 @@ const getStudentAttendanceReport = async (req, res) => {
         message: "Bạn chỉ được xem báo cáo điểm danh của chính mình",
       });
     }
+    let selectedClass = null;
 
+    if (classId) {
+      selectedClass = await Class.findById(classId).select(
+        "name description subject teacher students schedule status",
+      );
+
+      if (!selectedClass) {
+        return res.status(404).json({
+          message: "Không tìm thấy lớp học",
+        });
+      }
+
+      const belongsToClass = selectedClass.students.some((classStudentId) =>
+        isSameId(classStudentId, studentId),
+      );
+
+      if (!belongsToClass) {
+        return res.status(403).json({
+          message: "Học sinh không thuộc lớp học này",
+        });
+      }
+
+      /*
+       * Teacher chỉ được xem báo cáo trong lớp mình phụ trách.
+       */
+      if (
+        req.user.role === "teacher" &&
+        !isSameId(selectedClass.teacher, req.user._id)
+      ) {
+        return res.status(403).json({
+          message: "Bạn không có quyền xem báo cáo của lớp này",
+        });
+      }
+    }
+
+    /*
+     * Student phải mở báo cáo từ một lớp cụ thể,
+     * không được xem dữ liệu gộp của nhiều lớp.
+     */
+    if (req.user.role === "student" && !classId) {
+      return res.status(400).json({
+        message: "Vui lòng chọn lớp học cần xem chuyên cần",
+      });
+    }
     const filter = {
       "records.studentId": studentId,
+      isFinalized: true,
     };
-
+    if (classId) {
+      filter.classId = classId;
+    }
     if (from || to) {
       filter.date = {};
 
@@ -394,6 +440,7 @@ const getStudentAttendanceReport = async (req, res) => {
           });
         }
 
+        toDate.setHours(23, 59, 59, 999);
         filter.date.$lte = toDate;
       }
     }
@@ -408,7 +455,7 @@ const getStudentAttendanceReport = async (req, res) => {
       });
     }
 
-    if (req.user.role === "teacher") {
+    if (req.user.role === "teacher" && !classId) {
       const teacherClasses = await Class.find({
         teacher: req.user._id,
         students: studentId,
@@ -464,6 +511,7 @@ const getStudentAttendanceReport = async (req, res) => {
     return res.status(200).json({
       message: "Lấy báo cáo điểm danh học sinh thành công",
       student,
+      class: selectedClass,
       summary,
       details,
     });
@@ -481,10 +529,341 @@ const getStudentAttendanceReport = async (req, res) => {
     });
   }
 };
+// GET /api/v1/attendance/teacher/week-status?from=2026-08-03&to=2026-08-09
+const getTeacherAttendanceWeekStatus = async (req, res) => {
+  try {
+    const { from, to } = req.query;
 
+    if (!from || !to) {
+      return res.status(400).json({
+        message: "Vui lòng cung cấp đầy đủ ngày from và to",
+      });
+    }
+
+    const fromDate = normalizeDate(from);
+    const toDate = normalizeDate(to);
+
+    if (!fromDate || !toDate) {
+      return res.status(400).json({
+        message: "Khoảng ngày không hợp lệ",
+      });
+    }
+
+    if (fromDate > toDate) {
+      return res.status(400).json({
+        message: "Ngày from không được lớn hơn ngày to",
+      });
+    }
+
+    /*
+     * Lấy hết dữ liệu đến cuối ngày to.
+     */
+    toDate.setHours(23, 59, 59, 999);
+
+    const attendances = await Attendance.find({
+      teacherId: req.user._id,
+      date: {
+        $gte: fromDate,
+        $lte: toDate,
+      },
+    })
+      .select("_id classId date isFinalized")
+      .sort({
+        date: 1,
+      });
+
+    const statuses = attendances.map((attendance) => ({
+      attendanceId: attendance._id,
+      classId: attendance.classId,
+      date: attendance.date,
+      isFinalized: attendance.isFinalized,
+    }));
+
+    return res.status(200).json({
+      message: "Lấy trạng thái điểm danh theo tuần thành công",
+      count: statuses.length,
+      statuses,
+    });
+  } catch (error) {
+    console.log("Lỗi lấy trạng thái điểm danh theo tuần:", error);
+
+    return res.status(500).json({
+      message: "Lỗi server",
+    });
+  }
+};
+// GET /api/v1/attendance/admin/day-status?date=2026-08-03
+const getAdminAttendanceDayStatus = async (req, res) => {
+  try {
+    const { date } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        message: "Vui lòng cung cấp ngày cần xem",
+      });
+    }
+
+    const attendanceDate = normalizeDate(date);
+
+    if (!attendanceDate) {
+      return res.status(400).json({
+        message: "Ngày cần xem không hợp lệ",
+      });
+    }
+
+    const endOfDay = new Date(attendanceDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const attendances = await Attendance.find({
+      date: {
+        $gte: attendanceDate,
+        $lte: endOfDay,
+      },
+    })
+      .select("_id classId date isFinalized")
+      .sort({
+        date: 1,
+      });
+
+    const statuses = attendances.map((attendance) => ({
+      attendanceId: attendance._id,
+      classId: attendance.classId,
+      date: attendance.date,
+      isFinalized: attendance.isFinalized,
+    }));
+
+    return res.status(200).json({
+      message: "Lấy trạng thái điểm danh theo ngày thành công",
+      count: statuses.length,
+      statuses,
+    });
+  } catch (error) {
+    console.log("Lỗi lấy trạng thái điểm danh theo ngày cho admin:", error);
+
+    return res.status(500).json({
+      message: "Lỗi server",
+    });
+  }
+};
+
+// GET /api/v1/attendance/classes/:classId/report?from=2026-07-01&to=2026-07-31
+const getClassAttendanceReport = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { from, to } = req.query;
+
+    const classData = await Class.findById(classId)
+      .populate("teacher", "name email phone")
+      .populate("students", "name email phone role");
+
+    if (!classData) {
+      return res.status(404).json({
+        message: "Không tìm thấy lớp học",
+      });
+    }
+
+    /*
+     * Admin xem được tất cả lớp.
+     * Teacher chỉ xem được lớp mình phụ trách.
+     */
+    if (
+      req.user.role === "teacher" &&
+      !isSameId(classData.teacher?._id || classData.teacher, req.user._id)
+    ) {
+      return res.status(403).json({
+        message: "Bạn không có quyền xem báo cáo của lớp này",
+      });
+    }
+
+    const attendanceFilter = {
+      classId,
+      isFinalized: true,
+    };
+
+    if (from || to) {
+      attendanceFilter.date = {};
+
+      if (from) {
+        const fromDate = normalizeDate(from);
+
+        if (!fromDate) {
+          return res.status(400).json({
+            message: "Ngày from không hợp lệ",
+          });
+        }
+
+        attendanceFilter.date.$gte = fromDate;
+      }
+
+      if (to) {
+        const toDate = normalizeDate(to);
+
+        if (!toDate) {
+          return res.status(400).json({
+            message: "Ngày to không hợp lệ",
+          });
+        }
+
+        /*
+         * Bao gồm toàn bộ ngày kết thúc.
+         */
+        toDate.setHours(23, 59, 59, 999);
+        attendanceFilter.date.$lte = toDate;
+      }
+    }
+
+    if (
+      attendanceFilter.date?.$gte &&
+      attendanceFilter.date?.$lte &&
+      attendanceFilter.date.$gte > attendanceFilter.date.$lte
+    ) {
+      return res.status(400).json({
+        message: "Ngày from không được lớn hơn ngày to",
+      });
+    }
+
+    const attendances = await Attendance.find(attendanceFilter)
+      .select("date records summary isFinalized")
+      .sort({
+        date: 1,
+      });
+
+    /*
+     * Khởi tạo tất cả học sinh hiện có trong lớp.
+     * Nhờ vậy, học sinh chưa có dữ liệu điểm danh vẫn được hiển thị.
+     */
+    const studentReportMap = new Map();
+
+    classData.students.forEach((student) => {
+      studentReportMap.set(student._id.toString(), {
+        student: {
+          _id: student._id,
+          name: student.name,
+          email: student.email,
+          phone: student.phone || "",
+        },
+
+        summary: {
+          total: 0,
+          present: 0,
+          late: 0,
+          excused: 0,
+          absent: 0,
+        },
+      });
+    });
+
+    /*
+     * Chỉ cộng dữ liệu từ các buổi đã chốt.
+     */
+    attendances.forEach((attendance) => {
+      attendance.records.forEach((record) => {
+        const studentId = record.studentId.toString();
+        const studentReport = studentReportMap.get(studentId);
+
+        /*
+         * Không cộng học sinh đã rời khỏi lớp
+         * và không còn trong danh sách hiện tại.
+         */
+        if (!studentReport) {
+          return;
+        }
+
+        studentReport.summary.total += 1;
+
+        if (record.status === "present") {
+          studentReport.summary.present += 1;
+        }
+
+        if (record.status === "late") {
+          studentReport.summary.late += 1;
+        }
+
+        if (record.status === "excused") {
+          studentReport.summary.excused += 1;
+        }
+
+        if (record.status === "absent") {
+          studentReport.summary.absent += 1;
+        }
+      });
+    });
+
+    const students = Array.from(studentReportMap.values())
+      .map((item) => {
+        const attendedSessions = item.summary.present + item.summary.late;
+
+        const attendanceRate =
+          item.summary.total > 0
+            ? Math.round((attendedSessions / item.summary.total) * 100)
+            : 0;
+
+        return {
+          ...item,
+          attendanceRate,
+        };
+      })
+      .sort((firstStudent, secondStudent) =>
+        firstStudent.student.name.localeCompare(
+          secondStudent.student.name,
+          "vi",
+        ),
+      );
+
+    const averageAttendanceRate =
+      students.length > 0
+        ? Math.round(
+            students.reduce(
+              (total, student) => total + student.attendanceRate,
+              0,
+            ) / students.length,
+          )
+        : 0;
+
+    return res.status(200).json({
+      message: "Lấy báo cáo chuyên cần của lớp thành công",
+
+      class: {
+        _id: classData._id,
+        name: classData.name,
+        description: classData.description,
+        subject: classData.subject,
+        status: classData.status,
+        startedAt: classData.startedAt,
+        endedAt: classData.endedAt,
+        teacher: classData.teacher,
+      },
+
+      range: {
+        from: from || null,
+        to: to || null,
+      },
+
+      totalSessions: attendances.length,
+      totalStudents: classData.students.length,
+      averageAttendanceRate,
+      students,
+    });
+  } catch (error) {
+    console.log("Lỗi lấy báo cáo chuyên cần của lớp:", error);
+
+    if (error.name === "CastError") {
+      return res.status(400).json({
+        message: "classId không hợp lệ",
+      });
+    }
+
+    return res.status(500).json({
+      message: "Lỗi server",
+    });
+  }
+};
 module.exports = {
   markAttendance,
   getAttendanceByClassAndDate,
   finalizeAttendance,
   getStudentAttendanceReport,
+  getTeacherAttendanceWeekStatus,
+  getAdminAttendanceDayStatus,
+  getClassAttendanceReport,
 };

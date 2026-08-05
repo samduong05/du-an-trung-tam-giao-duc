@@ -34,11 +34,37 @@ export default defineConfig(({ mode }) => {
     build: {
       rollupOptions: {
         output: {
-          manualChunks: {
-            vendor: ["react", "react-dom", "react-router-dom"],
-            redux: ["@reduxjs/toolkit", "react-redux"],
-            charts: ["recharts"],
-            motion: ["framer-motion", "gsap"],
+          manualChunks(moduleId) {
+            const id = moduleId.replaceAll("\\", "/");
+
+            if (!id.includes("/node_modules/")) {
+              return undefined;
+            }
+
+            if (
+              id.includes("/node_modules/react/") ||
+              id.includes("/node_modules/react-dom/") ||
+              id.includes("/node_modules/react-router-dom/")
+            ) {
+              return "vendor";
+            }
+
+            if (
+              id.includes("/node_modules/@reduxjs/toolkit/") ||
+              id.includes("/node_modules/react-redux/")
+            ) {
+              return "redux";
+            }
+
+            if (id.includes("/node_modules/recharts/")) {
+              return "charts";
+            }
+
+            if (id.includes("/node_modules/framer-motion/")) {
+              return "motion";
+            }
+
+            return undefined;
           },
         },
       },

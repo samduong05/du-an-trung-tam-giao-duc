@@ -11,7 +11,7 @@ import {
   UserRoundX,
   Users,
 } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 
 import { useGetClassByIdQuery } from "../../store/api/classesApi";
@@ -40,12 +40,16 @@ const STATUS_OPTIONS: {
     label: "Có mặt",
   },
   {
-    value: "absent",
-    label: "Vắng",
-  },
-  {
     value: "late",
     label: "Đi muộn",
+  },
+  {
+    value: "excused",
+    label: "Nghỉ có phép",
+  },
+  {
+    value: "absent",
+    label: "Vắng",
   },
 ];
 
@@ -57,6 +61,24 @@ const getLocalDateInputValue = (): string => {
   const day = String(date.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+};
+const isValidDateInputValue = (dateValue: string | null): boolean => {
+  if (!dateValue) {
+    return false;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return false;
+  }
+
+  const [year, month, day] = dateValue.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
 };
 
 const formatDateVietnamese = (dateValue: string): string => {
@@ -121,6 +143,8 @@ const getStatusButtonClassName = (
 
     case "late":
       return "border-amber-500 bg-amber-500 text-white";
+    case "excused":
+      return "border-blue-600 bg-blue-600 text-white";
 
     default:
       return "border-blue-600 bg-blue-600 text-white";
@@ -129,8 +153,15 @@ const getStatusButtonClassName = (
 
 export default function TeacherAttendanceDetailPage() {
   const { classId } = useParams<{ classId: string }>();
+  const [searchParams] = useSearchParams();
 
-  const [selectedDate, setSelectedDate] = useState(getLocalDateInputValue());
+  const dateFromUrl = searchParams.get("date");
+
+  const [selectedDate, setSelectedDate] = useState(() =>
+    isValidDateInputValue(dateFromUrl)
+      ? dateFromUrl!
+      : getLocalDateInputValue(),
+  );
   const [records, setRecords] = useState<LocalAttendanceRecord[]>([]);
   const [remarks, setRemarks] = useState("");
 
@@ -229,8 +260,9 @@ export default function TeacherAttendanceDetailPage() {
     return {
       total: records.length,
       present: records.filter((record) => record.status === "present").length,
-      absent: records.filter((record) => record.status === "absent").length,
       late: records.filter((record) => record.status === "late").length,
+      excused: records.filter((record) => record.status === "excused").length,
+      absent: records.filter((record) => record.status === "absent").length,
     };
   }, [records]);
 
@@ -492,7 +524,7 @@ export default function TeacherAttendanceDetailPage() {
         )}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-sm text-slate-500">Tổng học sinh</p>
           <p className="mt-2 text-2xl font-bold text-slate-900">
@@ -506,18 +538,22 @@ export default function TeacherAttendanceDetailPage() {
             {summary.present}
           </p>
         </div>
-
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-          <p className="text-sm text-red-700">Vắng</p>
-          <p className="mt-2 text-2xl font-bold text-red-700">
-            {summary.absent}
-          </p>
-        </div>
-
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm text-amber-700">Đi muộn</p>
           <p className="mt-2 text-2xl font-bold text-amber-700">
             {summary.late}
+          </p>
+        </div>
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+          <p className="text-sm text-blue-700">Nghỉ có phép</p>
+          <p className="mt-2 text-2xl font-bold text-blue-700">
+            {summary.excused}
+          </p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+          <p className="text-sm text-red-700">Vắng</p>
+          <p className="mt-2 text-2xl font-bold text-red-700">
+            {summary.absent}
           </p>
         </div>
       </section>
@@ -669,7 +705,7 @@ export default function TeacherAttendanceDetailPage() {
                     {record.email}
                   </p>
 
-                  <div className="mt-4 grid grid-cols-3 gap-2">
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {STATUS_OPTIONS.map((option) => (
                       <button
                         key={option.value}

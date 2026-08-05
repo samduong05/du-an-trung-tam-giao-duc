@@ -1,23 +1,34 @@
 import { useState } from "react";
 import { CalendarDays, Loader2, Plus, UserRound, Users, X } from "lucide-react";
 import toast from "react-hot-toast";
-
+import ScheduleConflictModal from "./ScheduleConflictModal";
 import {
-  useGetStudentsQuery,
+  // useGetStudentsQuery,
   useGetTeachersQuery,
 } from "../../store/api/endpoints";
 
 import {
   useAddStudentToClassMutation,
   useAssignTeacherToClassMutation,
+  useGetAvailableStudentsQuery,
   useRemoveStudentFromClassMutation,
   type ClassItem,
   type DayOfWeek,
+  type ScheduleConflictResponse,
 } from "../../store/api/classesApi";
 
 interface ClassDetailsProps {
   classItem: ClassItem;
 }
+type PendingConflictAction =
+  | {
+      type: "assignTeacher";
+      teacherId: string;
+    }
+  | {
+      type: "addStudent";
+      studentId: string;
+    };
 
 const DAY_LABELS: Record<DayOfWeek, string> = {
   monday: "Thứ 2",
@@ -43,6 +54,34 @@ const getErrorMessage = (error: unknown): string | undefined => {
   return undefined;
 };
 
+const getScheduleConflictResponse = (
+  error: unknown,
+): ScheduleConflictResponse | null => {
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    !("status" in error) ||
+    !("data" in error)
+  ) {
+    return null;
+  }
+
+  const apiError = error as {
+    status?: number;
+    data?: Partial<ScheduleConflictResponse>;
+  };
+
+  if (
+    apiError.status !== 409 ||
+    apiError.data?.requiresConfirmation !== true ||
+    !Array.isArray(apiError.data.conflicts)
+  ) {
+    return null;
+  }
+
+  return apiError.data as ScheduleConflictResponse;
+};
+
 const formatDate = (date?: string) => {
   if (!date) {
     return "—";
@@ -61,8 +100,8 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
   const { data: teachersData, isLoading: isLoadingTeachers } =
     useGetTeachersQuery();
 
-  const { data: studentsData, isLoading: isLoadingStudents } =
-    useGetStudentsQuery();
+  const { data: availableStudentsData, isLoading: isLoadingStudents } =
+    useGetAvailableStudentsQuery(classItem._id);
 
   const [assignTeacherToClass] = useAssignTeacherToClassMutation();
 
@@ -79,26 +118,27 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
   const [isAddingStudent, setIsAddingStudent] = useState(false);
 
   const [removingStudentId, setRemovingStudentId] = useState<string | null>(
-    null,
-  );
+  null,
+);
+  const [conflictResponse, setConflictResponse] =
+    useState<ScheduleConflictResponse | null>(null);
+
+  const [pendingConflictAction, setPendingConflictAction] =
+    useState<PendingConflictAction | null>(null);
 
   const teachers = teachersData?.users ?? [];
-  const students = studentsData?.users ?? [];
+  const availableStudents = availableStudentsData?.students ?? [];
 
-  const availableStudents = students.filter(
-    (student) =>
-      !classItem.students.some(
-        (classStudent) => classStudent._id === student._id,
-      ),
-  );
-
-  const handleAssignTeacher = async () => {
-    if (!selectedTeacherId) {
+  const handleAssignTeacher = async (
+    forceSave = false,
+    teacherId = selectedTeacherId,
+  ) => {
+    if (!teacherId) {
       toast.error("Vui lòng chọn giáo viên");
       return;
     }
 
-    if (selectedTeacherId === classItem.teacher?._id) {
+    if (teacherId === classItem.teacher?._id) {
       toast.error("Giáo viên này đang phụ trách lớp");
       return;
     }
@@ -108,12 +148,28 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
 
       await assignTeacherToClass({
         classId: classItem._id,
-        teacherId: selectedTeacherId,
+        teacherId,
+        forceSave,
       }).unwrap();
 
       toast.success("Thay giáo viên phụ trách thành công");
+
       setSelectedTeacherId("");
+      setConflictResponse(null);
+      setPendingConflictAction(null);
     } catch (error) {
+      const conflict = getScheduleConflictResponse(error);
+
+      if (conflict) {
+        setPendingConflictAction({
+          type: "assignTeacher",
+          teacherId,
+        });
+
+        setConflictResponse(conflict);
+        return;
+      }
+
       toast.error(
         getErrorMessage(error) ?? "Không thể thay giáo viên phụ trách",
       );
@@ -122,8 +178,11 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
     }
   };
 
-  const handleAddStudent = async () => {
-    if (!selectedStudentId) {
+  const handleAddStudent = async (
+    forceSave = false,
+    studentId = selectedStudentId,
+  ) => {
+    if (!studentId) {
       toast.error("Vui lòng chọn học sinh");
       return;
     }
@@ -133,16 +192,45 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
 
       await addStudentToClass({
         classId: classItem._id,
-        studentId: selectedStudentId,
+        studentId,
+        forceSave,
       }).unwrap();
 
       toast.success("Thêm học sinh vào lớp thành công");
+
       setSelectedStudentId("");
+      setConflictResponse(null);
+      setPendingConflictAction(null);
     } catch (error) {
+      const conflict = getScheduleConflictResponse(error);
+
+      if (conflict) {
+        setPendingConflictAction({
+          type: "addStudent",
+          studentId,
+        });
+
+        setConflictResponse(conflict);
+        return;
+      }
+
       toast.error(getErrorMessage(error) ?? "Không thể thêm học sinh vào lớp");
     } finally {
       setIsAddingStudent(false);
     }
+  };
+  const handleConfirmConflict = async () => {
+    if (!pendingConflictAction) {
+      return;
+    }
+
+    if (pendingConflictAction.type === "assignTeacher") {
+      await handleAssignTeacher(true, pendingConflictAction.teacherId);
+
+      return;
+    }
+
+    await handleAddStudent(true, pendingConflictAction.studentId);
   };
 
   const handleRemoveStudent = async (
@@ -174,6 +262,7 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
   };
 
   return (
+    <>
     <div className="space-y-6 border-t border-slate-200 bg-slate-50 p-4 sm:p-6">
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="rounded-xl border border-slate-200 bg-white p-4">
@@ -297,7 +386,7 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
 
               <button
                 type="button"
-                onClick={handleAssignTeacher}
+                onClick={() => handleAssignTeacher()}
                 disabled={isAssigningTeacher || isLoadingTeachers}
                 className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -345,7 +434,7 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
 
             <button
               type="button"
-              onClick={handleAddStudent}
+              onClick={() => handleAddStudent()}
               disabled={
                 isAddingStudent ||
                 isLoadingStudents ||
@@ -468,5 +557,24 @@ export default function ClassDetails({ classItem }: ClassDetailsProps) {
         )}
       </section>
     </div>
-  );
+    <ScheduleConflictModal
+      isOpen={conflictResponse !== null}
+      conflictResponse={conflictResponse}
+      isConfirming={
+        isAssigningTeacher || isAddingStudent
+      }
+      onClose={() => {
+        if (
+          !isAssigningTeacher &&
+          !isAddingStudent
+        ) {
+          setConflictResponse(null);
+          setPendingConflictAction(null);
+        }
+      }}
+      onConfirm={handleConfirmConflict}
+    />
+  </>
+);
 }
+ 

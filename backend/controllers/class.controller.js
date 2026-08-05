@@ -1,6 +1,17 @@
 const User = require("../models/User.model");
 const Class = require("../models/Class.model");
+const {
+  findClassScheduleConflicts,
+} = require("../utils/classScheduleConflict.utils");
 
+const sendScheduleConflictResponse = (res, conflicts) => {
+  return res.status(409).json({
+    message: "Phát hiện xung đột lịch",
+    requiresConfirmation: true,
+    conflictCount: conflicts.length,
+    conflicts,
+  });
+};
 // GET /api/v1/classes
 const getClasses = async (req, res) => {
   try {
@@ -81,7 +92,77 @@ const getClassById = async (req, res) => {
     });
   }
 };
+// GET /api/v1/classes/my-classes
+// Student chỉ xem những lớp có mình trong danh sách students
+const getMyClasses = async (req, res) => {
+  try {
+    const { status, search } = req.query;
 
+    const filter = {
+      students: req.user._id,
+    };
+
+    if (status) {
+      if (!["active", "paused", "completed"].includes(status)) {
+        return res.status(400).json({
+          message: "Trạng thái lớp không hợp lệ",
+        });
+      }
+
+      filter.status = status;
+    }
+
+    if (search) {
+      filter.name = {
+        $regex: search,
+        $options: "i",
+      };
+    }
+
+    const classes = await Class.find(filter)
+      .populate("teacher", "name email role phone")
+      .sort({ createdAt: -1 });
+
+    return res.json({
+      message: "Lấy danh sách lớp của học sinh thành công",
+      count: classes.length,
+      classes,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Lỗi server",
+      error: error.message,
+    });
+  }
+};
+
+// GET /api/v1/classes/my-classes/:id
+// Student chỉ được xem chi tiết lớp có chứa mình
+const getMyClassById = async (req, res) => {
+  try {
+    const classData = await Class.findOne({
+      _id: req.params.id,
+      students: req.user._id,
+    }).populate("teacher", "name email role phone");
+
+    if (!classData) {
+      return res.status(404).json({
+        message: "Không tìm thấy lớp học hoặc bạn không thuộc lớp này",
+      });
+    }
+
+    return res.json({
+      message: "Lấy chi tiết lớp của học sinh thành công",
+      class: classData,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Lỗi server",
+      error: error.message,
+    });
+  }
+};
+// POST /api/v1/classes
 // POST /api/v1/classes
 const createClass = async (req, res) => {
   try {
@@ -101,6 +182,7 @@ const createClass = async (req, res) => {
       status,
       startedAt,
       endedAt,
+      forceSave = false,
     } = req.body;
 
     if (!name || !subject || !teacherId) {
@@ -124,7 +206,9 @@ const createClass = async (req, res) => {
 
     if (Array.isArray(students) && students.length > 0) {
       const foundStudents = await User.find({
-        _id: { $in: students },
+        _id: {
+          $in: students,
+        },
         role: "student",
       }).select("_id");
 
@@ -137,10 +221,30 @@ const createClass = async (req, res) => {
       studentIds = foundStudents.map((student) => student._id);
     }
 
-    if (status && !["active", "paused", "completed"].includes(status)) {
+    const classStatus = status ?? "active";
+
+    if (!["active", "paused", "completed"].includes(classStatus)) {
       return res.status(400).json({
         message: "Trạng thái lớp không hợp lệ",
       });
+    }
+
+    /*
+     * Chỉ bỏ qua cảnh báo khi Admin đã xác nhận forceSave = true.
+     */
+    if (forceSave !== true) {
+      const conflicts = await findClassScheduleConflicts({
+        teacherId: teacher._id,
+        studentIds,
+        schedule: Array.isArray(schedule) ? schedule : [],
+        status: classStatus,
+        startedAt,
+        endedAt,
+      });
+
+      if (conflicts.length > 0) {
+        return sendScheduleConflictResponse(res, conflicts);
+      }
     }
 
     const newClass = await Class.create({
@@ -150,7 +254,7 @@ const createClass = async (req, res) => {
       schedule,
       teacher: teacher._id,
       students: studentIds,
-      status,
+      status: classStatus,
       startedAt,
       endedAt,
     });
@@ -172,6 +276,7 @@ const createClass = async (req, res) => {
 };
 
 // PUT /api/v1/classes/:id
+// PUT /api/v1/classes/:id
 const updateClass = async (req, res) => {
   try {
     if (req.user.role !== "admin") {
@@ -190,6 +295,7 @@ const updateClass = async (req, res) => {
       status,
       startedAt,
       endedAt,
+      forceSave = false,
     } = req.body;
 
     const classData = await Class.findById(req.params.id);
@@ -199,9 +305,15 @@ const updateClass = async (req, res) => {
         message: "Không tìm thấy lớp học",
       });
     }
-    if (subject !== undefined) {
-      classData.subject = subject;
-    }
+
+    /*
+     * Tạo dữ liệu dự kiến sau cập nhật.
+     *
+     * Phải kiểm tra conflict trên dữ liệu mới,
+     * nhưng chưa được ghi vào database.
+     */
+    let proposedTeacherId = classData.teacher;
+
     if (teacherId) {
       const teacher = await User.findOne({
         _id: teacherId,
@@ -214,12 +326,16 @@ const updateClass = async (req, res) => {
         });
       }
 
-      classData.teacher = teacher._id;
+      proposedTeacherId = teacher._id;
     }
+
+    let proposedStudentIds = classData.students;
 
     if (Array.isArray(students)) {
       const foundStudents = await User.find({
-        _id: { $in: students },
+        _id: {
+          $in: students,
+        },
         role: "student",
       }).select("_id");
 
@@ -229,24 +345,89 @@ const updateClass = async (req, res) => {
         });
       }
 
-      classData.students = foundStudents.map((student) => student._id);
+      proposedStudentIds = foundStudents.map((student) => student._id);
     }
 
-    if (status) {
-      if (!["active", "paused", "completed"].includes(status)) {
-        return res.status(400).json({
-          message: "Trạng thái lớp không hợp lệ",
-        });
+    const proposedStatus = status !== undefined ? status : classData.status;
+
+    if (!["active", "paused", "completed"].includes(proposedStatus)) {
+      return res.status(400).json({
+        message: "Trạng thái lớp không hợp lệ",
+      });
+    }
+
+    const proposedSchedule =
+      schedule !== undefined ? schedule : classData.schedule;
+
+    const proposedStartedAt =
+      startedAt !== undefined ? startedAt || null : classData.startedAt;
+
+    const proposedEndedAt =
+      endedAt !== undefined ? endedAt || null : classData.endedAt;
+
+    /*
+     * Khi sửa lớp phải loại chính lớp đang sửa.
+     */
+    if (forceSave !== true) {
+      const conflicts = await findClassScheduleConflicts(
+        {
+          teacherId: proposedTeacherId,
+          studentIds: proposedStudentIds,
+          schedule: proposedSchedule,
+          status: proposedStatus,
+          startedAt: proposedStartedAt,
+          endedAt: proposedEndedAt,
+        },
+        {
+          excludeClassId: classData._id,
+        },
+      );
+
+      if (conflicts.length > 0) {
+        return sendScheduleConflictResponse(res, conflicts);
       }
-
-      classData.status = status;
     }
 
-    if (name) classData.name = name;
-    if (description !== undefined) classData.description = description;
-    if (schedule !== undefined) classData.schedule = schedule;
-    if (startedAt !== undefined) classData.startedAt = startedAt;
-    if (endedAt !== undefined) classData.endedAt = endedAt;
+    /*
+     * Chỉ cập nhật document sau khi:
+     * - không có conflict; hoặc
+     * - Admin đã gửi forceSave = true.
+     */
+    if (name !== undefined) {
+      classData.name = name;
+    }
+
+    if (subject !== undefined) {
+      classData.subject = subject;
+    }
+
+    if (description !== undefined) {
+      classData.description = description;
+    }
+
+    if (teacherId) {
+      classData.teacher = proposedTeacherId;
+    }
+
+    if (Array.isArray(students)) {
+      classData.students = proposedStudentIds;
+    }
+
+    if (schedule !== undefined) {
+      classData.schedule = schedule;
+    }
+
+    if (status !== undefined) {
+      classData.status = proposedStatus;
+    }
+
+    if (startedAt !== undefined) {
+      classData.startedAt = startedAt || null;
+    }
+
+    if (endedAt !== undefined) {
+      classData.endedAt = endedAt || null;
+    }
 
     await classData.save();
 
@@ -354,6 +535,8 @@ const deleteClass = async (req, res) => {
 module.exports = {
   getClasses,
   getClassById,
+  getMyClasses,
+  getMyClassById,
   createClass,
   updateClass,
   updateClassStatus,

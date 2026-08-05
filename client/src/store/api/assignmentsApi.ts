@@ -1,16 +1,8 @@
 import { apiSlice } from "./apiSlice";
 
-export type AssignmentType =
-  | "essay"
-  | "homework"
-  | "project"
-  | "classwork";
+export type AssignmentType = "essay" | "homework" | "project" | "classwork";
 
-export type SubmissionStatus =
-  | "submitted"
-  | "late"
-  | "graded"
-  | "returned";
+export type SubmissionStatus = "submitted" | "late" | "graded" | "returned";
 
 export interface AssignmentFile {
   name: string;
@@ -64,7 +56,7 @@ export interface AssignmentItem {
   dueDate: string;
   maxScore: number;
   attachments: AssignmentFile[];
-  submissions: AssignmentSubmission[];
+  submissions?: AssignmentSubmission[];
   submissionCount: number;
   pendingCount: number;
   isPublished: boolean;
@@ -72,6 +64,8 @@ export interface AssignmentItem {
   allowResubmission: boolean;
   createdAt: string;
   updatedAt: string;
+  hasSubmitted?: boolean;
+  mySubmission?: AssignmentSubmission | null;
 }
 
 export interface GetAssignmentsResponse {
@@ -91,6 +85,17 @@ export interface UploadAssignmentFilesResponse {
   message: string;
   count: number;
   files: AssignmentFile[];
+}
+
+export interface SubmitAssignmentInput {
+  assignmentId: string;
+  text?: string;
+  files?: AssignmentFile[];
+}
+
+export interface SubmitAssignmentResponse {
+  message: string;
+  submission: AssignmentSubmission;
 }
 
 export interface GetAssignmentsParams {
@@ -189,6 +194,24 @@ export const assignmentsApi = apiSlice.injectEndpoints({
       },
     }),
 
+    uploadAssignmentSubmissionFiles: builder.mutation<
+      UploadAssignmentFilesResponse,
+      File[]
+    >({
+      query: (files) => {
+        const formData = new FormData();
+
+        files.forEach((file) => {
+          formData.append("files", file);
+        });
+
+        return {
+          url: "/uploads/assignment-submissions",
+          method: "POST",
+          body: formData,
+        };
+      },
+    }),
     createAssignment: builder.mutation<
       AssignmentMutationResponse,
       CreateAssignmentInput
@@ -230,6 +253,24 @@ export const assignmentsApi = apiSlice.injectEndpoints({
       ],
     }),
 
+    submitAssignment: builder.mutation<
+      SubmitAssignmentResponse,
+      SubmitAssignmentInput
+    >({
+      query: ({ assignmentId, text, files }) => ({
+        url: `/assignments/${assignmentId}/submit`,
+        method: "POST",
+        body: {
+          text: text ?? "",
+          files: files ?? [],
+        },
+      }),
+
+      invalidatesTags: (_result, _error, { assignmentId }) => [
+        { type: "Assignments", id: "LIST" },
+        { type: "Assignments", id: assignmentId },
+      ],
+    }),
     gradeSubmission: builder.mutation<
       GradeSubmissionResponse,
       GradeSubmissionInput
@@ -257,8 +298,10 @@ export const {
   useGetAssignmentByIdQuery,
   useLazyGetAssignmentByIdQuery,
   useUploadAssignmentFilesMutation,
+  useUploadAssignmentSubmissionFilesMutation,
   useCreateAssignmentMutation,
   useUpdateAssignmentMutation,
   useDeleteAssignmentMutation,
+  useSubmitAssignmentMutation,
   useGradeSubmissionMutation,
 } = assignmentsApi;

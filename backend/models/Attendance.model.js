@@ -10,7 +10,7 @@ const attendanceRecordSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["present", "absent", "late"],
+      enum: ["present", "late", "excused", "absent"],
       default: "absent",
     },
 
@@ -74,6 +74,10 @@ const attendanceSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      excused: {
+        type: Number,
+        default: 0,
+      },
     },
 
     isFinalized: {
@@ -102,11 +106,9 @@ attendanceSchema.pre("save", function () {
       present: this.records.filter((r) => r.status === "present").length,
       absent: this.records.filter((r) => r.status === "absent").length,
       late: this.records.filter((r) => r.status === "late").length,
-      
+      excused: this.records.filter((r) => r.status === "excused").length,
     };
   }
-
-  
 });
-
+  
 module.exports = mongoose.model("Attendance", attendanceSchema);

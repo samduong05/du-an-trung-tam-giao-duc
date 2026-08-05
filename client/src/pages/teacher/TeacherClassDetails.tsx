@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import TeacherCreateStudentModal from "./TeacherCreateStudentModal";
 import {
   BookOpen,
   CalendarDays,
+  ClipboardCheck,
   Loader2,
   UserPlus,
   Users,
@@ -311,12 +313,12 @@ export default function TeacherClassDetails({
               <table className="w-full table-fixed text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 text-left text-slate-500">
-                    <th className="w-[28%] px-3 py-2 font-medium">Họ và tên</th>
-                    <th className="w-[34%] px-3 py-2 font-medium">Email</th>
-                    <th className="w-[22%] px-3 py-2 font-medium">
+                    <th className="w-[24%] px-3 py-2 font-medium">Họ và tên</th>
+                    <th className="w-[28%] px-3 py-2 font-medium">Email</th>
+                    <th className="w-[18%] px-3 py-2 font-medium">
                       Số điện thoại
                     </th>
-                    <th className="w-[16%] px-3 py-2 text-right font-medium">
+                    <th className="w-[30%] px-3 py-2 text-right font-medium">
                       Thao tác
                     </th>
                   </tr>
@@ -337,22 +339,32 @@ export default function TeacherClassDetails({
                       <td className="truncate px-3 py-3 text-slate-700">
                         {student.phone || "—"}
                       </td>
-                      <td className="px-3 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            handleRemoveStudent(student._id, student.name)
-                          }
-                          disabled={removingStudentId === student._id}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          {removingStudentId === student._id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <X className="h-4 w-4" />
-                          )}
-                          Gỡ khỏi lớp
-                        </button>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-end gap-4">
+                          <Link
+                            to={`/teacher/classes/${classItem._id}/students/${student._id}/attendance`}
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-blue-600 transition hover:text-blue-700"
+                          >
+                            <ClipboardCheck className="h-4 w-4" />
+                            Xem chuyên cần
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleRemoveStudent(student._id, student.name)
+                            }
+                            disabled={removingStudentId === student._id}
+                            className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {removingStudentId === student._id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                            Gỡ khỏi lớp
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -374,21 +386,31 @@ export default function TeacherClassDetails({
                     {student.phone || "Chưa có số điện thoại"}
                   </p>
 
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleRemoveStudent(student._id, student.name)
-                    }
-                    disabled={removingStudentId === student._id}
-                    className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {removingStudentId === student._id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <X className="h-4 w-4" />
-                    )}
-                    Gỡ khỏi lớp
-                  </button>
+                  <div className="mt-3 flex flex-wrap items-center gap-4">
+                    <Link
+                      to={`/teacher/classes/${classItem._id}/students/${student._id}/attendance`}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-blue-600 transition hover:text-blue-700"
+                    >
+                      <ClipboardCheck className="h-4 w-4" />
+                      Xem chuyên cần
+                    </Link>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleRemoveStudent(student._id, student.name)
+                      }
+                      disabled={removingStudentId === student._id}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 transition hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {removingStudentId === student._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <X className="h-4 w-4" />
+                      )}
+                      Gỡ khỏi lớp
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

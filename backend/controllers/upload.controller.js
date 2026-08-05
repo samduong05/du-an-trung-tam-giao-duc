@@ -51,6 +51,25 @@ const uploadAssignmentFiles = async (req, res) => {
   });
 };
 
+const uploadAssignmentSubmissionFiles = async (req, res) => {
+  const files = req.files || [];
+
+  if (files.length === 0) {
+    return res.status(400).json({
+      message: "Vui lòng chọn ít nhất một file bài làm",
+    });
+  }
+
+  const uploadedFiles = files.map((file) =>
+    getUploadedFileMetadata(file, "assignment-submissions"),
+  );
+
+  return res.status(201).json({
+    message: "Tải file bài làm lên thành công",
+    count: uploadedFiles.length,
+    files: uploadedFiles,
+  });
+};
 // Middleware Quiz đã có, nhưng controller này hiện chỉ trả metadata.
 // Logic đọc TXT/DOCX sẽ được làm trong quiz import controller riêng.
 const uploadQuizSourceFile = async (req, res) => {
@@ -81,5 +100,6 @@ const uploadQuizSourceFile = async (req, res) => {
 module.exports = {
   uploadMaterialFiles,
   uploadAssignmentFiles,
+  uploadAssignmentSubmissionFiles,
   uploadQuizSourceFile,
 };

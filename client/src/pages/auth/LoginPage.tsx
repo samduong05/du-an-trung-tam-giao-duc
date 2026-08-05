@@ -42,7 +42,13 @@ export default function LoginPage() {
 
       dispatch(
         setCredentials({
-          user: response.user,
+          user: {
+            id: response.user.id,
+            name: response.user.name,
+            email: response.user.email,
+            role: response.user.role,
+            phone: response.user.phone,
+          },
           accessToken: response.token,
         }),
       );
@@ -99,7 +105,7 @@ export default function LoginPage() {
 
           <div className="flex-1 flex flex-col justify-center max-w-md">
             <div className="animate-fade-up">
-             <h1 className="font-sans font-bold text-4xl text-text-primary leading-tight tracking-normal mb-4">
+              <h1 className="font-sans font-bold text-4xl text-text-primary leading-tight tracking-normal mb-4">
                 Quản lý trung tâm tiếng Anh dễ dàng hơn
               </h1>
 

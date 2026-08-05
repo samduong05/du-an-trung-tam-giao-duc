@@ -2,6 +2,10 @@ const mongoose = require("mongoose");
 
 const User = require("../models/User.model");
 const Class = require("../models/Class.model");
+const {
+  CONFLICT_TYPES,
+  findClassScheduleConflicts,
+} = require("../utils/classScheduleConflict.utils");
 
 const populateClass = async (classId) => {
   return Class.findById(classId)
@@ -98,10 +102,12 @@ const getAvailableStudents = async (req, res) => {
 };
 
 // POST /api/v1/classes/:id/students
+// POST /api/v1/classes/:id/students
 const addStudentToClass = async (req, res) => {
   try {
     const { id } = req.params;
-    const { studentId } = req.body;
+
+    const { studentId, forceSave = false } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
@@ -139,7 +145,7 @@ const addStudentToClass = async (req, res) => {
       _id: studentId,
       role: "student",
       isActive: true,
-    }).select("_id");
+    }).select("_id name email");
 
     if (!student) {
       return res.status(400).json({
@@ -158,6 +164,38 @@ const addStudentToClass = async (req, res) => {
       });
     }
 
+    /*
+     * Chỉ kiểm tra học sinh đang được thêm.
+     *
+     * Không truyền toàn bộ học sinh hiện tại vì thao tác này
+     * không thay đổi lịch của những học sinh đã có trong lớp.
+     */
+    if (forceSave !== true) {
+      const conflicts = await findClassScheduleConflicts(
+        {
+          teacherId: classData.teacher,
+          studentIds: [student._id],
+          schedule: classData.schedule,
+          status: classData.status,
+          startedAt: classData.startedAt,
+          endedAt: classData.endedAt,
+        },
+        {
+          excludeClassId: classData._id,
+          conflictTypes: [CONFLICT_TYPES.STUDENT],
+        },
+      );
+
+      if (conflicts.length > 0) {
+        return res.status(409).json({
+          message: "Phát hiện xung đột lịch",
+          requiresConfirmation: true,
+          conflictCount: conflicts.length,
+          conflicts,
+        });
+      }
+    }
+
     classData.students.push(student._id);
 
     await classData.save();
@@ -173,6 +211,7 @@ const addStudentToClass = async (req, res) => {
 
     return res.status(500).json({
       message: "Lỗi server",
+      error: error.message,
     });
   }
 };
@@ -243,4 +282,6 @@ module.exports = {
   getAvailableStudents,
   addStudentToClass,
   removeStudentFromClass,
+  populateClass,
+  canManageClassStudents,
 };

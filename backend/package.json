@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "seed:users": "node scripts/seedUsers.js"
+    "seed:users": "node scripts/seedUsers.js",
+    "test": "node --test"
   },
   "keywords": [],
   "author": "",

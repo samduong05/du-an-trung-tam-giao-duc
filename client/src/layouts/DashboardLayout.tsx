@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch } from "../store";
 import toast from "react-hot-toast";
 import {
   BookOpen,
+  CalendarDays,
   ClipboardCheck,
+  ClipboardList,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -38,6 +41,18 @@ const navConfig: Record<string, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
+      label: "Lịch dạy trong ngày",
+      path: "/admin/schedule",
+      icon: CalendarDays,
+    },
+
+    {
+      label: "Chuyên cần",
+      path: "/admin/attendance",
+      icon: ClipboardCheck,
+    },
+
+    {
       label: "Giáo viên",
       path: "/admin/teachers",
       icon: Users,
@@ -66,6 +81,11 @@ const navConfig: Record<string, NavItem[]> = {
       icon: LayoutDashboard,
     },
     {
+      label: "Lịch dạy của tôi",
+      path: "/teacher/schedule",
+      icon: CalendarDays,
+    },
+    {
       label: "Lớp học của tôi",
       path: "/teacher/classes",
       icon: BookOpen,
@@ -76,15 +96,16 @@ const navConfig: Record<string, NavItem[]> = {
       icon: ClipboardCheck,
     },
     {
+      label: "Bài tập",
+      path: "/teacher/assignments",
+      icon: ClipboardList,
+    },
+    {
       label: "Tài liệu",
       path: "/teacher/materials",
       icon: FileText,
     },
-    {
-      label: "Học sinh",
-      path: "/teacher/students",
-      icon: Users,
-    },
+    
   ],
 
   student: [
@@ -93,6 +114,7 @@ const navConfig: Record<string, NavItem[]> = {
       path: "/student",
       icon: LayoutDashboard,
     },
+
     {
       label: "Lớp học của tôi",
       path: "/student/classes",
@@ -112,10 +134,7 @@ const roleLabels: Record<string, string> = {
   student: "Học sinh",
 };
 
-function DashboardSidebar({
-  isOpen,
-  onClose,
-}: DashboardSidebarProps) {
+function DashboardSidebar({ isOpen, onClose }: DashboardSidebarProps) {
   const user = useSelector((state: RootState) => state.auth.user);
 
   const role = user?.role || "student";
@@ -128,9 +147,7 @@ function DashboardSidebar({
       }`}
     >
       <div className="flex h-16 items-center justify-between border-b border-slate-700 px-5">
-        <h1 className="truncate text-lg font-bold sm:text-xl">
-          English LMS
-        </h1>
+        <h1 className="truncate text-lg font-bold sm:text-xl">English LMS</h1>
 
         <button
           type="button"
@@ -179,13 +196,12 @@ function DashboardSidebar({
 export default function DashboardLayout() {
   const user = useSelector((state: RootState) => state.auth.user);
 
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  const [logout, { isLoading: isLoggingOut }] =
-    useLogoutMutation();
+  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
 
   const handleLogout = async () => {
     try {

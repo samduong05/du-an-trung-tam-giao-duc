@@ -3,6 +3,8 @@ const express = require("express");
 const {
   getClasses,
   getClassById,
+  getMyClasses,
+  getMyClassById,
   createClass,
   updateClass,
   updateClassStatus,
@@ -40,7 +42,26 @@ router.get(
   authorizeRoles("admin", "teacher"),
   getClasses,
 );
+// ====================
+// LỚP HỌC CỦA HỌC SINH
+// Student chỉ xem lớp có chứa mình
+// ====================
 
+router.get(
+  "/my-classes",
+  requireMongoConnection,
+  authentication,
+  authorizeRoles("student"),
+  getMyClasses,
+);
+
+router.get(
+  "/my-classes/:id",
+  requireMongoConnection,
+  authentication,
+  authorizeRoles("student"),
+  getMyClassById,
+);
 router.get(
   "/:id",
   requireMongoConnection,

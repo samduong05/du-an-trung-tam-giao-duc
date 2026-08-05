@@ -185,7 +185,7 @@ export default function StudentsPage() {
         ) : (
           <>
             <div className="w-full space-y-3 xl:hidden">
-              {currentStudents.map((student, index) => (
+              {currentStudents.map((student) => (
                 <div
                   key={student._id}
                   className="w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
