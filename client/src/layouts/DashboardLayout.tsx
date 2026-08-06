@@ -120,11 +120,7 @@ const navConfig: Record<string, NavItem[]> = {
       path: "/student/classes",
       icon: BookOpen,
     },
-    {
-      label: "Tài liệu",
-      path: "/student/materials",
-      icon: FileText,
-    },
+    
   ],
 };
 
