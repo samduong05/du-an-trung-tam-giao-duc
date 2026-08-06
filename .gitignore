@@ -1,10 +1,19 @@
+# Dependencies
 node_modules/
-backend/node_modules/
-lms-app/node_modules/
+**/node_modules/
+
+# Build
 dist/
-backend/server.log
-backend/server.err.log
-backend/uploads/
-lms-app/vite.log
-lms-app/vite.err.log
+**/dist/
+
+# Environment
 .env
+**/.env
+
+# Logs
+*.log
+backend/*.log
+lms-app/*.log
+
+# Uploads
+backend/uploads/
