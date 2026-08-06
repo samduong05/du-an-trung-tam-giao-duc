@@ -18,8 +18,10 @@ const assignmentRoutes = require("./routes/assignment.routes");
 const uploadRoutes = require("./routes/upload.routes");
 
 const app = express();
+app.set("trust proxy", 1);
 
 ensureUploadsDir();
+
 
 app.use(helmet());
 
